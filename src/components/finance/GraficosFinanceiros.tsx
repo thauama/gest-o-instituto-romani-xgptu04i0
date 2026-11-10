@@ -33,7 +33,7 @@ const tooltipEstilo = {
   color: '#e2e8f0',
 }
 
-const eixo = { stroke: '#64748b', fontSize: 11 }
+const eixo = { stroke: '#94a3b8', fontSize: 11, fill: '#cbd5e1' }
 
 export const GraficoEvolucaoMensal = ({
   dados,
@@ -48,12 +48,12 @@ export const GraficoEvolucaoMensal = ({
         <span className="h-2 w-2 rounded-full bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.9)]" />
         Evolução mensal
       </h3>
-      <p className="text-xs text-slate-400 mt-0.5">Receitas, despesas e lucro líquido por mês</p>
+      <p className="text-xs text-slate-300 mt-0.5">Receitas, despesas e lucro líquido por mês</p>
     </div>
     {loading ? (
       <div className="h-72 animate-pulse rounded-lg bg-slate-800/50" />
     ) : dados.length === 0 ? (
-      <div className="h-72 flex items-center justify-center text-xs text-slate-500 border border-dashed border-slate-700 rounded-lg">
+      <div className="h-72 flex items-center justify-center text-xs text-slate-300 border border-dashed border-slate-700 rounded-lg">
         Sem lançamentos no período.
       </div>
     ) : (
@@ -65,9 +65,9 @@ export const GraficoEvolucaoMensal = ({
           <Tooltip
             contentStyle={tooltipEstilo}
             formatter={(value: number, name: string) => [fmtBRL(value), name]}
-            labelStyle={{ color: '#94a3b8' }}
+            labelStyle={{ color: '#cbd5e1' }}
           />
-          <Legend wrapperStyle={{ fontSize: 11, color: '#94a3b8' }} />
+          <Legend wrapperStyle={{ fontSize: 11, color: '#cbd5e1' }} />
           <Bar
             dataKey="receitas"
             name="Receitas"
@@ -112,14 +112,14 @@ export const GraficoReceitasCategoria = ({
           <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]" />
           Composição das receitas
         </h3>
-        <p className="text-xs text-slate-400 mt-0.5">
+        <p className="text-xs text-slate-300 mt-0.5">
           Por categoria {total > 0 && `· total ${fmtBRL(total)}`}
         </p>
       </div>
       {loading ? (
         <div className="h-64 animate-pulse rounded-lg bg-slate-800/50" />
       ) : dados.length === 0 ? (
-        <div className="h-64 flex items-center justify-center text-xs text-slate-500 border border-dashed border-slate-700 rounded-lg">
+        <div className="h-64 flex items-center justify-center text-xs text-slate-300 border border-dashed border-slate-700 rounded-lg">
           Sem receitas no período.
         </div>
       ) : (
@@ -155,7 +155,7 @@ export const GraficoReceitasCategoria = ({
                   />
                   {d.nome}
                 </span>
-                <span className="tabular-nums text-slate-400">
+                <span className="tabular-nums text-slate-300">
                   {total > 0 ? `${((d.valor / total) * 100).toFixed(1).replace('.', ',')}%` : '—'} ·{' '}
                   {fmtBRL(d.valor)}
                 </span>
@@ -181,12 +181,12 @@ export const GraficoDespesasCategoria = ({
         <span className="h-2 w-2 rounded-full bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.9)]" />
         Despesas por categoria
       </h3>
-      <p className="text-xs text-slate-400 mt-0.5">Onde o dinheiro da clínica está indo</p>
+      <p className="text-xs text-slate-300 mt-0.5">Onde o dinheiro da clínica está indo</p>
     </div>
     {loading ? (
       <div className="h-64 animate-pulse rounded-lg bg-slate-800/50" />
     ) : dados.length === 0 ? (
-      <div className="h-64 flex items-center justify-center text-xs text-slate-500 border border-dashed border-slate-700 rounded-lg">
+      <div className="h-64 flex items-center justify-center text-xs text-slate-300 border border-dashed border-slate-700 rounded-lg">
         Sem despesas no período.
       </div>
     ) : (
@@ -238,14 +238,14 @@ export const GraficoProcedimentos = ({
         <span className="h-2 w-2 rounded-full bg-violet-400 shadow-[0_0_8px_rgba(167,139,250,0.9)]" />
         Receitas por procedimento
       </h3>
-      <p className="text-xs text-slate-400 mt-0.5">
+      <p className="text-xs text-slate-300 mt-0.5">
         Via contratos vinculados aos lançamentos de receita
       </p>
     </div>
     {loading ? (
       <div className="h-56 animate-pulse rounded-lg bg-slate-800/50" />
     ) : dados.length === 0 ? (
-      <div className="h-56 flex items-center justify-center text-xs text-slate-500 border border-dashed border-slate-700 rounded-lg">
+      <div className="h-56 flex items-center justify-center text-xs text-slate-300 border border-dashed border-slate-700 rounded-lg">
         Nenhuma receita vinculada a contrato no período.
       </div>
     ) : (

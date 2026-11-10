@@ -1,6 +1,7 @@
 import pb from '@/lib/pocketbase/client'
 import type {
   Cliente,
+  CategoriaFinanceira,
   ItemEstoque,
   Movimentacao,
   Orcamento,
@@ -166,6 +167,31 @@ export const consultasService = {
   },
   async delete(id: string) {
     return await pb.collection('consultas').delete(id)
+  },
+}
+
+// Categorias Financeiras Service
+// Leitura: qualquer usuário autenticado. Escrita: admin (garantido pelas regras da coleção).
+export const categoriasFinanceirasService = {
+  async list(filter = '', sort = 'nome') {
+    return await pb.collection('financeiro_categorias').getFullList<CategoriaFinanceira>({
+      filter,
+      sort,
+    })
+  },
+  async create(data: { nome: string; tipo: 'receita' | 'despesa'; criado_por?: string }) {
+    return await pb.collection('financeiro_categorias').create<CategoriaFinanceira>({
+      nome: data.nome.trim(),
+      tipo: data.tipo,
+      ativa: true,
+      criado_por: data.criado_por || '',
+    })
+  },
+  async update(id: string, data: Partial<CategoriaFinanceira>) {
+    return await pb.collection('financeiro_categorias').update<CategoriaFinanceira>(id, data)
+  },
+  async delete(id: string) {
+    return await pb.collection('financeiro_categorias').delete(id)
   },
 }
 

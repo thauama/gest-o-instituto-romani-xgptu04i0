@@ -122,14 +122,14 @@ export default function DialogoLancamento({
           <DialogTitle className="text-slate-100">
             {editando ? 'Editar Lançamento' : 'Novo Lançamento'}
           </DialogTitle>
-          <DialogDescription className="text-slate-400">
+          <DialogDescription className="text-slate-300">
             Registre uma receita ou despesa da clínica.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-slate-300">Tipo</Label>
+              <Label className="text-slate-200">Tipo</Label>
               <Select value={form.tipo} onValueChange={(v) => set('tipo', v)}>
                 <SelectTrigger className="bg-slate-800/60 border-slate-700 text-slate-100">
                   <SelectValue />
@@ -141,7 +141,7 @@ export default function DialogoLancamento({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-slate-300">Categoria</Label>
+              <Label className="text-slate-200">Categoria</Label>
               <Select value={form.categoria} onValueChange={(v) => set('categoria', v)}>
                 <SelectTrigger className="bg-slate-800/60 border-slate-700 text-slate-100">
                   <SelectValue />
@@ -158,18 +158,18 @@ export default function DialogoLancamento({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-slate-300">Descrição</Label>
+            <Label className="text-slate-200">Descrição</Label>
             <Input
               value={form.descricao}
               onChange={(e) => set('descricao', e.target.value)}
               placeholder="Ex.: Entrada contrato cirurgia — paciente"
-              className="bg-slate-800/60 border-slate-700 text-slate-100 placeholder:text-slate-500"
+              className="bg-slate-800/60 border-slate-700 text-slate-100 placeholder:text-slate-400"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-slate-300">Valor (R$)</Label>
+              <Label className="text-slate-200">Valor (R$)</Label>
               <Input
                 type="number"
                 min="0"
@@ -180,7 +180,7 @@ export default function DialogoLancamento({
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-slate-300">Data</Label>
+              <Label className="text-slate-200">Data</Label>
               <Input
                 type="date"
                 value={form.data}
@@ -192,7 +192,7 @@ export default function DialogoLancamento({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-slate-300">Mês de referência</Label>
+              <Label className="text-slate-200">Mês de referência</Label>
               <Input
                 type="month"
                 value={form.mes_referencia}
@@ -201,7 +201,7 @@ export default function DialogoLancamento({
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-slate-300">Cliente (opcional)</Label>
+              <Label className="text-slate-200">Cliente (opcional)</Label>
               <Select value={form.cliente} onValueChange={(v) => set('cliente', v)}>
                 <SelectTrigger className="bg-slate-800/60 border-slate-700 text-slate-100">
                   <SelectValue />
@@ -222,7 +222,7 @@ export default function DialogoLancamento({
             <Button
               variant="outline"
               onClick={onClose}
-              className="border-slate-700 text-slate-300 hover:bg-slate-800"
+              className="border-slate-700 text-slate-200 hover:bg-slate-800"
             >
               Cancelar
             </Button>

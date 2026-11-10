@@ -30,7 +30,7 @@ export const KpiCard = ({ kpi }: { kpi: KpiFinanceiro }) => {
   const v = kpi.variacao
   const Icon = v === null || Math.abs(v) < 0.05 ? Minus : v > 0 ? ArrowUpRight : ArrowDownRight
 
-  let corVar = 'text-slate-400'
+  let corVar = 'text-slate-300'
   if (v !== null && Math.abs(v) >= 0.05) {
     const subiu = v > 0
     const bom = kpi.invertido ? !subiu : subiu
@@ -40,13 +40,13 @@ export const KpiCard = ({ kpi }: { kpi: KpiFinanceiro }) => {
   return (
     <Card className="bg-slate-900/60 border-slate-700/60 shadow-[0_0_24px_rgba(56,189,248,0.06)] backdrop-blur">
       <CardHeader className="pb-1 px-5 pt-5">
-        <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+        <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-slate-300">
           {kpi.titulo}
         </CardTitle>
       </CardHeader>
       <CardContent className="px-5 pb-5 pt-0">
         <div className={cn('text-2xl font-bold tabular-nums', cor)}>
-          <span className="text-sm font-medium text-slate-400 mr-1">R$</span>
+          <span className="text-sm font-medium text-slate-300 mr-1">R$</span>
           {fmtBRL(kpi.valor)}
         </div>
         <div className="mt-1.5 flex items-center gap-1.5 text-[11px]">
@@ -56,7 +56,7 @@ export const KpiCard = ({ kpi }: { kpi: KpiFinanceiro }) => {
               {Math.abs(v).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%
             </span>
           )}
-          <span className="text-slate-500">{kpi.subtitulo || 'vs. período anterior'}</span>
+          <span className="text-slate-300">{kpi.subtitulo || 'vs. período anterior'}</span>
         </div>
       </CardContent>
     </Card>
@@ -64,7 +64,7 @@ export const KpiCard = ({ kpi }: { kpi: KpiFinanceiro }) => {
 }
 
 const pctLabel = (v: number | null, bom: boolean) => {
-  if (v === null || Math.abs(v) < 0.05) return { icone: Minus, cor: 'text-slate-400', txt: '—' }
+  if (v === null || Math.abs(v) < 0.05) return { icone: Minus, cor: 'text-slate-300', txt: '—' }
   const Icon = v > 0 ? ArrowUpRight : ArrowDownRight
   return {
     icone: Icon,
@@ -99,7 +99,7 @@ export const LinhaComparativa = ({
       <span className={cn('text-sm font-bold tabular-nums text-right', corValor)}>
         R$ {fmtBRL(atual)}
       </span>
-      <span className="text-xs tabular-nums text-right text-slate-500">
+      <span className="text-xs tabular-nums text-right text-slate-300">
         {anterior === 0 ? '—' : `R$ ${fmtBRL(anterior)}`}
       </span>
       <span
@@ -117,16 +117,16 @@ export const LinhaComparativa = ({
 
 export const CabecalhoComparativo = ({ rotulo }: { rotulo: string }) => (
   <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 pb-2 border-b border-slate-700/80">
-    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-300">
       {rotulo}
     </span>
-    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 w-28 text-right">
+    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-300 w-28 text-right">
       Atual
     </span>
-    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 w-28 text-right">
+    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-300 w-28 text-right">
       Anterior
     </span>
-    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 w-16 text-right">
+    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-300 w-16 text-right">
       Δ
     </span>
   </div>

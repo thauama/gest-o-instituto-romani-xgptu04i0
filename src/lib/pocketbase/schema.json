@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-10T20:12:17.957Z",
+  "generatedAt": "2026-11-10T20:23:05.633Z",
   "collections": [
     {
       "name": "users",
@@ -692,6 +692,62 @@
       "indexes": [
         "CREATE INDEX idx_financeiro_mes ON financeiro (mes_referencia)",
         "CREATE INDEX idx_financeiro_tipo ON financeiro (tipo)"
+      ]
+    },
+    {
+      "name": "financeiro_categorias",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.role = 'admin'",
+        "update": "@request.auth.role = 'admin'",
+        "delete": "@request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "nome",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "tipo",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["receita", "despesa"]
+        },
+        {
+          "name": "ativa",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "criado_por",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_fin_cat_nome_tipo ON financeiro_categorias (nome, tipo)",
+        "CREATE INDEX idx_fin_cat_tipo ON financeiro_categorias (tipo)"
       ]
     }
   ]

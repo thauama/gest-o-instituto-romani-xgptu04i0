@@ -61,7 +61,7 @@ export default function DialogoNotaFiscal({ registro, open, onClose, onSolicitad
       <DialogContent className="bg-slate-900 border-slate-700 text-slate-100 sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-slate-100">Solicitar Nota Fiscal</DialogTitle>
-          <DialogDescription className="text-slate-400">
+          <DialogDescription className="text-slate-300">
             {registro.descricao} —{' '}
             <span className="font-semibold text-emerald-300">
               R${' '}
@@ -80,14 +80,14 @@ export default function DialogoNotaFiscal({ registro, open, onClose, onSolicitad
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="financeiro@institutoromani.com.br"
-              className="bg-slate-800/60 border-slate-700 text-slate-100 placeholder:text-slate-500"
+              className="bg-slate-800/60 border-slate-700 text-slate-100 placeholder:text-slate-400"
             />
           </div>
           <div className="flex justify-end gap-2">
             <Button
               variant="outline"
               onClick={onClose}
-              className="border-slate-700 text-slate-300 hover:bg-slate-800"
+              className="border-slate-700 text-slate-200 hover:bg-slate-800"
             >
               Cancelar
             </Button>

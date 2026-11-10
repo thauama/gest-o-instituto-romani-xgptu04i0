@@ -5,11 +5,7 @@ import {
   Filter,
   ListFilter,
   Plus,
-  Receipt,
-  TrendingDown,
-  TrendingUp,
-  Wallet,
-  Loader2,
+  Tag,
   Pencil,
   Trash2,
 } from 'lucide-react'
@@ -28,8 +24,8 @@ import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from '@/hooks/use-toast'
 import { getErrorMessage } from '@/lib/pocketbase/errors'
-import { clientesService, financeiroService } from '@/services/clinic'
-import type { Cliente, RegistroFinanceiro } from '@/types/clinic'
+import { categoriasFinanceirasService, clientesService, financeiroService } from '@/services/clinic'
+import type { CategoriaFinanceira, Cliente, RegistroFinanceiro } from '@/types/clinic'
 import { useAuth } from '@/hooks/use-auth'
 import DialogoLancamento, {
   CATEGORIAS_DESPESA,
@@ -37,6 +33,15 @@ import DialogoLancamento, {
   type FormLancamento,
 } from '@/components/finance/DialogoLancamento'
 import DialogoNotaFiscal from '@/components/finance/DialogoNotaFiscal'
+import DialogoCategorias from '@/components/finance/DialogoCategorias'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import {
   KpiCard,
   LinhaComparativa,
@@ -101,6 +106,7 @@ export default function Financeiro() {
   const [loading, setLoading] = useState(true)
   const [registros, setRegistros] = useState<RegistroFinanceiro[]>([])
   const [clientes, setClientes] = useState<Cliente[]>([])
+  const [categorias, setCategorias] = useState<CategoriaFinanceira[]>([])
   const [erro, setErro] = useState('')
 
   // filtros
@@ -119,6 +125,9 @@ export default function Financeiro() {
   const [editando, setEditando] = useState<RegistroFinanceiro | null>(null)
   const [nfRegistro, setNfRegistro] = useState<RegistroFinanceiro | null>(null)
   const [nfAberto, setNfAberto] = useState(false)
+  const [dialogoCategoriasAberto, setDialogoCategoriasAberto] = useState(false)
+  const [modoCategoriasAberto, setModoCategoriasAberto] = useState(false)
+  const [modoFoco, setModoFoco] = useState<'receita' | 'despesa'>('receita')
   const [salvando, setSalvando] = useState(false)
 
   const meses = useMemo(opcoesMes, [])
@@ -131,9 +140,14 @@ export default function Financeiro() {
     setLoading(true)
     setErro('')
     try {
-      const [fin, cls] = await Promise.all([financeiroService.list(), clientesService.list()])
+      const [fin, cls, cats] = await Promise.all([
+        financeiroService.list(),
+        clientesService.list(),
+        categoriasFinanceirasService.list(),
+      ])
       setRegistros(fin)
       setClientes(cls)
+      setCategorias(cats)
     } catch (err) {
       console.error(err)
       setErro(getErrorMessage(err) || 'Não foi possível carregar os dados financeiros.')
@@ -166,6 +180,36 @@ export default function Financeiro() {
   const receitasCat = useMemo(() => receitasPorCategoria(filtrados), [filtrados])
   const despesasCat = useMemo(() => despesasPorCategoria(filtrados), [filtrados])
   const procedimentos = useMemo(() => valorPorProcedimento(filtrados), [filtrados])
+
+  // Categorias gerenciadas no banco + fallback das constantes padrão (dedupe case-insensitive)
+  const normalizar = (s: string) => s.trim().toLowerCase()
+  const categoriasReceita = useMemo(() => {
+    const doBanco = categorias
+      .filter((c) => c.tipo === 'receita' && c.ativa !== false)
+      .map((c) => c.nome)
+    const todas = [...doBanco, ...CATEGORIAS_RECEITA]
+    const vistas = new Set<string>()
+    return todas.filter((n) => {
+      const k = normalizar(n)
+      if (vistas.has(k)) return false
+      vistas.add(k)
+      return true
+    })
+  }, [categorias])
+
+  const categoriasDespesa = useMemo(() => {
+    const doBanco = categorias
+      .filter((c) => c.tipo === 'despesa' && c.ativa !== false)
+      .map((c) => c.nome)
+    const todas = [...doBanco, ...CATEGORIAS_DESPESA]
+    const vistas = new Set<string>()
+    return todas.filter((n) => {
+      const k = normalizar(n)
+      if (vistas.has(k)) return false
+      vistas.add(k)
+      return true
+    })
+  }, [categorias])
 
   const kpis: KpiFinanceiro[] = [
     {
@@ -282,17 +326,28 @@ export default function Financeiro() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-100">Controle Financeiro</h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-300 mt-1">
             Receitas, despesas e margens da clínica — atualizado em{' '}
             {new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}.
           </p>
         </div>
-        <Button
-          onClick={abrirNovo}
-          className="bg-sky-600 hover:bg-sky-500 text-white shadow-[0_0_18px_rgba(56,189,248,0.35)]"
-        >
-          <Plus className="h-4 w-4 mr-1" /> Novo lançamento
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setModoCategoriasAberto(true)}
+            className="border-slate-600 bg-slate-800/60 text-slate-100 hover:bg-slate-700/60 hover:text-white"
+          >
+            <Tag className="h-4 w-4 mr-1" /> Categorias
+          </Button>
+          {isAdmin && (
+            <Button
+              onClick={abrirNovo}
+              className="bg-sky-600 hover:bg-sky-500 text-white shadow-[0_0_18px_rgba(56,189,248,0.35)]"
+            >
+              <Plus className="h-4 w-4 mr-1" /> Novo lançamento
+            </Button>
+          )}
+        </div>
       </div>
 
       {erro && (
@@ -309,7 +364,7 @@ export default function Financeiro() {
         <CardContent className="px-5 py-4">
           <div className="flex flex-col lg:flex-row lg:items-end gap-4">
             <div className="space-y-1.5 min-w-[180px]">
-              <Label className="text-[11px] uppercase tracking-wider text-slate-400">Período</Label>
+              <Label className="text-[11px] uppercase tracking-wider text-slate-300">Período</Label>
               <Select value={modo} onValueChange={(v) => setModo(v as ModoPeriodo)}>
                 <SelectTrigger className="bg-slate-800/60 border-slate-700 text-slate-100 w-[180px]">
                   <CalendarRange className="h-4 w-4 mr-1 text-sky-400" />
@@ -325,7 +380,7 @@ export default function Financeiro() {
 
             {modo === 'mes' && (
               <div className="space-y-1.5 min-w-[160px]">
-                <Label className="text-[11px] uppercase tracking-wider text-slate-400">
+                <Label className="text-[11px] uppercase tracking-wider text-slate-300">
                   Mês de referência
                 </Label>
                 <Select value={mesSel} onValueChange={setMesSel}>
@@ -346,7 +401,7 @@ export default function Financeiro() {
             {modo === 'intervalo' && (
               <div className="flex items-end gap-3 flex-wrap">
                 <div className="space-y-1.5">
-                  <Label className="text-[11px] uppercase tracking-wider text-slate-400">De</Label>
+                  <Label className="text-[11px] uppercase tracking-wider text-slate-300">De</Label>
                   <Input
                     type="date"
                     value={inicio}
@@ -355,7 +410,7 @@ export default function Financeiro() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-[11px] uppercase tracking-wider text-slate-400">Até</Label>
+                  <Label className="text-[11px] uppercase tracking-wider text-slate-300">Até</Label>
                   <Input
                     type="date"
                     value={fim}
@@ -366,10 +421,10 @@ export default function Financeiro() {
               </div>
             )}
 
-            <div className="lg:ml-auto flex items-center gap-2 text-xs text-slate-400">
+            <div className="lg:ml-auto flex items-center gap-2 text-xs text-slate-300">
               <Filter className="h-3.5 w-3.5 text-sky-400" />
-              Exibindo: <span className="font-semibold text-slate-200">{modoLabel(janela)}</span>
-              <span className="text-slate-500">·</span>
+              Exibindo: <span className="font-semibold text-slate-100">{modoLabel(janela)}</span>
+              <span className="text-slate-400">·</span>
               <span>{totais.lancamentos} lançamento(s)</span>
             </div>
           </div>
@@ -402,19 +457,19 @@ export default function Financeiro() {
             <BarChart3 className="h-4 w-4 text-sky-400" />
             Comparativo de períodos
           </CardTitle>
-          <CardDescription className="text-xs text-slate-400">
-            Período atual <span className="text-slate-200 font-medium">
+          <CardDescription className="text-xs text-slate-300">
+            Período atual <span className="text-slate-100 font-medium">
               {modoLabel(janela)}
             </span>{' '}
             contra{' '}
-            <span className="text-slate-200 font-medium">
+            <span className="text-slate-100 font-medium">
               {janela.modo === 'tudo' ? '—' : modoLabel(janelaAnterior(janela))}
             </span>
           </CardDescription>
         </CardHeader>
         <CardContent>
           {janela.modo === 'tudo' ? (
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-300">
               Selecione um mês ou intervalo para comparar com o período anterior.
             </p>
           ) : (
@@ -460,7 +515,7 @@ export default function Financeiro() {
                 <ListFilter className="h-4 w-4 text-sky-400" />
                 Lançamentos do período
               </CardTitle>
-              <CardDescription className="text-xs text-slate-400">
+              <CardDescription className="text-xs text-slate-300">
                 Registre, edite e solicite notas fiscais.
               </CardDescription>
             </div>
@@ -469,7 +524,7 @@ export default function Financeiro() {
                 placeholder="Buscar descrição, categoria, cliente…"
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
-                className="bg-slate-800/60 border-slate-700 text-slate-100 h-9 w-56 text-xs placeholder:text-slate-500"
+                className="bg-slate-800/60 border-slate-700 text-slate-100 h-9 w-56 text-xs placeholder:text-slate-400"
               />
               <Select
                 value={filtroTipo}
@@ -495,14 +550,14 @@ export default function Financeiro() {
               ))}
             </div>
           ) : lancamentos.length === 0 ? (
-            <div className="p-8 text-center text-xs text-slate-500 border border-dashed border-slate-700 rounded-lg">
+            <div className="p-8 text-center text-xs text-slate-300 border border-dashed border-slate-600 rounded-lg">
               Nenhum lançamento no período/filtro selecionado.
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-left text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-700">
+                  <tr className="text-left text-[10px] uppercase tracking-wider text-slate-300 border-b border-slate-700">
                     <th className="py-2 pr-3">Data</th>
                     <th className="py-2 pr-3">Descrição</th>
                     <th className="py-2 pr-3">Categoria</th>
@@ -539,7 +594,7 @@ export default function Financeiro() {
                           {r.categoria || r.tipo}
                         </Badge>
                       </td>
-                      <td className="py-2.5 pr-3 text-slate-400 max-w-[160px] truncate">
+                      <td className="py-2.5 pr-3 text-slate-300 max-w-[160px] truncate">
                         {r.expand?.cliente?.nome || '—'}
                       </td>
                       <td
@@ -561,7 +616,7 @@ export default function Financeiro() {
                             {r.nf_solicitada ? 'Solicitada' : 'Solicitar'}
                           </button>
                         ) : (
-                          <span className="text-slate-600">—</span>
+                          <span className="text-slate-400">—</span>
                         )}
                       </td>
                       <td className="py-2.5 text-right whitespace-nowrap">
@@ -569,7 +624,7 @@ export default function Financeiro() {
                           variant="ghost"
                           size="sm"
                           onClick={() => abrirEdicao(r)}
-                          className="h-7 w-7 p-0 text-slate-400 hover:text-sky-300 hover:bg-slate-800"
+                          className="h-7 w-7 p-0 text-slate-300 hover:text-sky-300 hover:bg-slate-800"
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
@@ -577,7 +632,7 @@ export default function Financeiro() {
                           variant="ghost"
                           size="sm"
                           onClick={() => excluirLancamento(r)}
-                          className="h-7 w-7 p-0 text-slate-400 hover:text-rose-300 hover:bg-slate-800"
+                          className="h-7 w-7 p-0 text-slate-300 hover:text-rose-300 hover:bg-slate-800"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -595,14 +650,77 @@ export default function Financeiro() {
         open={dialogoAberto}
         editando={editando}
         clientes={clientes}
-        categoriasReceita={CATEGORIAS_RECEITA}
-        categoriasDespesa={CATEGORIAS_DESPESA}
+        categoriasReceita={categoriasReceita}
+        categoriasDespesa={categoriasDespesa}
         onClose={() => {
           setDialogoAberto(false)
           setEditando(null)
         }}
         onSave={salvarLancamento}
       />
+      <DialogoCategorias
+        open={dialogoCategoriasAberto}
+        isAdmin={isAdmin}
+        onClose={() => setDialogoCategoriasAberto(false)}
+        onMudou={carregar}
+      />
+      <Dialog
+        open={modoCategoriasAberto}
+        onOpenChange={(v) => !v && setModoCategoriasAberto(false)}
+      >
+        <DialogContent className="bg-slate-900 border-slate-700 text-slate-100 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-slate-100">
+              <Tag className="h-4 w-4 text-sky-400" /> Categorias — modo de acesso
+            </DialogTitle>
+            <DialogDescription className="text-slate-300">
+              As categorias de receita e despesa são gerenciadas apenas pelo administrador.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-1">
+            <button
+              type="button"
+              onClick={() => {
+                setModoCategoriasAberto(false)
+                setDialogoCategoriasAberto(true)
+              }}
+              className="w-full text-left rounded-lg border border-slate-700 bg-slate-800/40 p-3 text-slate-100 hover:bg-slate-800/80 transition-colors"
+            >
+              <span className="block text-sm font-medium">Gerenciar categorias</span>
+              <span className="block text-xs text-slate-300">
+                Abrir o gerenciador completo (criar, renomear, excluir)
+              </span>
+            </button>
+            <div className="grid gap-3 sm:grid-cols-2 pt-1">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-slate-200">Foco inicial</Label>
+                <RadioGroup
+                  value={modoFoco}
+                  onValueChange={(v) => setModoFoco(v as 'receita' | 'despesa')}
+                  className="flex gap-4 pt-1"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="receita" id="modo-foco-receita" />
+                    <Label htmlFor="modo-foco-receita" className="text-xs text-slate-100">
+                      Receita
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="despesa" id="modo-foco-despesa" />
+                    <Label htmlFor="modo-foco-despesa" className="text-xs text-slate-100">
+                      Despesa
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              <p className="text-xs text-slate-300 self-end">
+                A escolha apenas destaca o tipo ao abrir o gerenciador; ambos os tipos ficam
+                visíveis.
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
       <DialogoNotaFiscal
         registro={nfRegistro}
         open={nfAberto}

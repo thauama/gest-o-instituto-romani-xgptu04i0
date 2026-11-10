@@ -111,6 +111,16 @@ export interface Consulta {
   updated: string
 }
 
+export interface CategoriaFinanceira {
+  id: string
+  nome: string
+  tipo: 'receita' | 'despesa'
+  ativa?: boolean
+  criado_por?: string
+  created: string
+  updated: string
+}
+
 export interface RegistroFinanceiro {
   id: string
   tipo: 'receita' | 'despesa'
