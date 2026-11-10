@@ -8,6 +8,7 @@ import {
   Tag,
   Pencil,
   Trash2,
+  Link2,
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -24,8 +25,13 @@ import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from '@/hooks/use-toast'
 import { getErrorMessage } from '@/lib/pocketbase/errors'
-import { categoriasFinanceirasService, clientesService, financeiroService } from '@/services/clinic'
-import type { CategoriaFinanceira, Cliente, RegistroFinanceiro } from '@/types/clinic'
+import {
+  categoriasFinanceirasService,
+  clientesService,
+  contratosService,
+  financeiroService,
+} from '@/services/clinic'
+import type { CategoriaFinanceira, Cliente, Contrato, RegistroFinanceiro } from '@/types/clinic'
 import { useAuth } from '@/hooks/use-auth'
 import DialogoLancamento, {
   CATEGORIAS_DESPESA,
@@ -34,6 +40,7 @@ import DialogoLancamento, {
 } from '@/components/finance/DialogoLancamento'
 import DialogoNotaFiscal from '@/components/finance/DialogoNotaFiscal'
 import DialogoCategorias from '@/components/finance/DialogoCategorias'
+import LucroPorContrato from '@/components/finance/LucroPorContrato'
 import {
   Dialog,
   DialogContent,
@@ -106,6 +113,7 @@ export default function Financeiro() {
   const [loading, setLoading] = useState(true)
   const [registros, setRegistros] = useState<RegistroFinanceiro[]>([])
   const [clientes, setClientes] = useState<Cliente[]>([])
+  const [contratos, setContratos] = useState<Contrato[]>([])
   const [categorias, setCategorias] = useState<CategoriaFinanceira[]>([])
   const [erro, setErro] = useState('')
 
@@ -140,13 +148,15 @@ export default function Financeiro() {
     setLoading(true)
     setErro('')
     try {
-      const [fin, cls, cats] = await Promise.all([
+      const [fin, cls, ctr, cats] = await Promise.all([
         financeiroService.list(),
         clientesService.list(),
+        contratosService.list(),
         categoriasFinanceirasService.list(),
       ])
       setRegistros(fin)
       setClientes(cls)
+      setContratos(ctr)
       setCategorias(cats)
     } catch (err) {
       console.error(err)
@@ -251,7 +261,8 @@ export default function Financeiro() {
         (r) =>
           r.descricao?.toLowerCase().includes(q) ||
           (r.categoria || '').toLowerCase().includes(q) ||
-          (r.expand?.cliente?.nome || '').toLowerCase().includes(q),
+          (r.expand?.cliente?.nome || '').toLowerCase().includes(q) ||
+          (r.expand?.contrato?.procedimento || '').toLowerCase().includes(q),
       )
     }
     return lista.sort((a, b) => (b.data || '').localeCompare(a.data || ''))
@@ -277,6 +288,7 @@ export default function Financeiro() {
         categoria: form.categoria,
         mes_referencia: form.mes_referencia,
         cliente: form.cliente === 'none' ? '' : form.cliente,
+        contrato: form.contrato === 'none' ? '' : form.contrato,
       }
       if (editando) {
         await financeiroService.update(editando.id, payload)
@@ -448,6 +460,7 @@ export default function Financeiro() {
           <GraficoDespesasCategoria dados={despesasCat} loading={loading} />
         </div>
         <GraficoProcedimentos dados={procedimentos} loading={loading} />
+        <LucroPorContrato registros={filtrados} loading={loading} />
       </div>
 
       {/* Comparativo de períodos */}
@@ -521,7 +534,7 @@ export default function Financeiro() {
             </div>
             <div className="flex items-center gap-2">
               <Input
-                placeholder="Buscar descrição, categoria, cliente…"
+                placeholder="Buscar descrição, categoria, cliente, contrato…"
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
                 className="bg-slate-800/60 border-slate-700 text-slate-100 h-9 w-56 text-xs placeholder:text-slate-400"
@@ -595,7 +608,23 @@ export default function Financeiro() {
                         </Badge>
                       </td>
                       <td className="py-2.5 pr-3 text-slate-300 max-w-[160px] truncate">
-                        {r.expand?.cliente?.nome || '—'}
+                        {r.expand?.cliente?.nome ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Link2 className="h-3 w-3 text-sky-400 shrink-0" />
+                            {r.expand.cliente.nome}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                        {r.expand?.contrato && (
+                          <span
+                            className="block text-[10px] text-slate-400 max-w-[160px] truncate"
+                            title={`Contrato: ${r.expand.contrato.procedimento}`}
+                          >
+                            <Link2 className="h-3 w-3 text-sky-400 inline mr-1 shrink-0" />
+                            {r.expand.contrato.procedimento || 'Contrato'}
+                          </span>
+                        )}
                       </td>
                       <td
                         className={`py-2.5 pr-3 text-right font-bold tabular-nums whitespace-nowrap ${
@@ -650,6 +679,7 @@ export default function Financeiro() {
         open={dialogoAberto}
         editando={editando}
         clientes={clientes}
+        contratos={contratos}
         categoriasReceita={categoriasReceita}
         categoriasDespesa={categoriasDespesa}
         onClose={() => {

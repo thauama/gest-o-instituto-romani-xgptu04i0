@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { Cliente, RegistroFinanceiro } from '@/types/clinic'
+import type { Cliente, Contrato, RegistroFinanceiro } from '@/types/clinic'
 
 export interface FormLancamento {
   tipo: 'receita' | 'despesa'
@@ -25,6 +25,7 @@ export interface FormLancamento {
   data: string
   categoria: string
   cliente: string
+  contrato: string
   mes_referencia: string
 }
 
@@ -32,6 +33,7 @@ interface Props {
   open: boolean
   editando: RegistroFinanceiro | null
   clientes: Cliente[]
+  contratos: Contrato[]
   categoriasReceita: string[]
   categoriasDespesa: string[]
   onClose: () => void
@@ -61,6 +63,7 @@ export default function DialogoLancamento({
   open,
   editando,
   clientes,
+  contratos,
   categoriasReceita,
   categoriasDespesa,
   onClose,
@@ -75,6 +78,7 @@ export default function DialogoLancamento({
     data: hoje,
     categoria: categoriasReceita[0],
     cliente: 'none',
+    contrato: 'none',
     mes_referencia: mesAtual,
   })
 
@@ -88,6 +92,7 @@ export default function DialogoLancamento({
           data: editando.data,
           categoria: editando.categoria || categoriasReceita[0],
           cliente: editando.cliente || 'none',
+          contrato: editando.contrato || 'none',
           mes_referencia: editando.mes_referencia || editando.data.slice(0, 7),
         })
       } else {
@@ -98,6 +103,7 @@ export default function DialogoLancamento({
           data: hoje,
           categoria: categoriasReceita[0],
           cliente: 'none',
+          contrato: 'none',
           mes_referencia: hoje.slice(0, 7),
         })
       }
@@ -202,7 +208,10 @@ export default function DialogoLancamento({
             </div>
             <div className="space-y-1.5">
               <Label className="text-slate-200">Cliente (opcional)</Label>
-              <Select value={form.cliente} onValueChange={(v) => set('cliente', v)}>
+              <Select
+                value={form.cliente}
+                onValueChange={(v) => set('cliente', v === 'none' ? '' : v)}
+              >
                 <SelectTrigger className="bg-slate-800/60 border-slate-700 text-slate-100">
                   <SelectValue />
                 </SelectTrigger>
@@ -216,6 +225,35 @@ export default function DialogoLancamento({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-slate-200">Contrato (opcional)</Label>
+            <Select
+              value={form.contrato || 'none'}
+              onValueChange={(v) => set('contrato', v === 'none' ? '' : v)}
+            >
+              <SelectTrigger className="bg-slate-800/60 border-slate-700 text-slate-100">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-900 border-slate-700 text-slate-100 max-h-60">
+                <SelectItem value="none">Sem vínculo</SelectItem>
+                {contratos.map((ct) => {
+                  const nomeCliente =
+                    ct.expand?.cliente?.nome || clientes.find((c) => c.id === ct.cliente)?.nome
+                  return (
+                    <SelectItem key={ct.id} value={ct.id}>
+                      {ct.procedimento || 'Contrato'}
+                      {nomeCliente ? ` — ${nomeCliente}` : ''}
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-slate-400">
+              Opcional — lance sem vínculo para custos gerais (aluguel, salários etc.). Vínculos
+              alimentam a visão de lucro por contrato.
+            </p>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
