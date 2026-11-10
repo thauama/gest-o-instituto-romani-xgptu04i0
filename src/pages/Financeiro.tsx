@@ -1,19 +1,21 @@
-import React, { useEffect, useState } from 'react'
-import { financeiroService, clientesService, contratosService } from '@/services/clinic'
-import type { RegistroFinanceiro, Cliente, Contrato } from '@/types/clinic'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
+  BarChart3,
+  CalendarRange,
+  Filter,
+  ListFilter,
+  Plus,
+  Receipt,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
+  Loader2,
+  Pencil,
+  Trash2,
+} from 'lucide-react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
@@ -21,555 +23,595 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Skeleton } from '@/components/ui/skeleton'
+import { toast } from '@/hooks/use-toast'
+import { getErrorMessage } from '@/lib/pocketbase/errors'
+import { clientesService, financeiroService } from '@/services/clinic'
+import type { Cliente, RegistroFinanceiro } from '@/types/clinic'
+import { useAuth } from '@/hooks/use-auth'
+import DialogoLancamento, {
+  CATEGORIAS_DESPESA,
+  CATEGORIAS_RECEITA,
+  type FormLancamento,
+} from '@/components/finance/DialogoLancamento'
+import DialogoNotaFiscal from '@/components/finance/DialogoNotaFiscal'
 import {
-  DollarSign,
-  TrendingUp,
-  TrendingDown,
-  Mail,
-  Plus,
-  Trash2,
-  CheckCircle2,
-  AlertCircle,
-  FileSpreadsheet,
-  Send,
-} from 'lucide-react'
+  KpiCard,
+  LinhaComparativa,
+  CabecalhoComparativo,
+  type KpiFinanceiro,
+} from '@/components/finance/KpiFinanceiro'
+import {
+  GraficoEvolucaoMensal,
+  GraficoReceitasCategoria,
+  GraficoDespesasCategoria,
+  GraficoProcedimentos,
+} from '@/components/finance/GraficosFinanceiros'
+import {
+  addMeses,
+  despesasPorCategoria,
+  filtrarPorJanela,
+  janelaAnterior,
+  labelMes,
+  receitasPorCategoria,
+  serieMensal,
+  totaisDe,
+  valorPorProcedimento,
+  variacaoPct,
+  type JanelaPeriodo,
+  type ModoPeriodo,
+} from '@/lib/finance-analytics'
+
+const fmtBRL = (v: number) =>
+  v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+const fmtBRLCurto = (v: number) => {
+  if (Math.abs(v) >= 1_000_000) return `R$ ${(v / 1_000_000).toFixed(1).replace('.', ',')}M`
+  if (Math.abs(v) >= 1_000) return `R$ ${(v / 1_000).toFixed(1).replace('.', ',')}k`
+  return `R$ ${v.toFixed(0)}`
+}
+
+const hoje = new Date()
+const MES_ATUAL = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`
+
+const opcoesMes = (): Array<{ value: string; label: string }> => {
+  const ops: Array<{ value: string; label: string }> = []
+  let m = MES_ATUAL
+  for (let i = 0; i < 18; i++) {
+    ops.push({ value: m, label: labelMes(m) })
+    m = addMeses(m, -1)
+  }
+  return ops
+}
+
+const modoLabel = (j: JanelaPeriodo): string => {
+  if (j.modo === 'tudo') return 'Todo o histórico'
+  if (j.modo === 'mes') return labelMes(j.inicio)
+  const mi = labelMes(j.inicio.slice(0, 7))
+  const mf = labelMes(j.fim.slice(0, 7))
+  return mi === mf ? mi : `${j.inicio.slice(8)} ${mi} → ${j.fim.slice(8)} ${mf}`
+}
+
+type Aba = 'visao' | 'lancamentos'
 
 export default function Financeiro() {
+  const { isAdmin } = useAuth()
+  const [loading, setLoading] = useState(true)
   const [registros, setRegistros] = useState<RegistroFinanceiro[]>([])
   const [clientes, setClientes] = useState<Cliente[]>([])
-  const [contratos, setContratos] = useState<Contrato[]>([])
-  const [loading, setLoading] = useState(true)
+  const [erro, setErro] = useState('')
 
-  // Filters
-  const currentMonthStr = new Date().toISOString().slice(0, 7)
-  const [mesFiltro, setMesFiltro] = useState<string>(currentMonthStr)
-  const [tipoFiltro, setTipoFiltro] = useState<string>('todos')
+  // filtros
+  const [modo, setModo] = useState<ModoPeriodo>('mes')
+  const [mesSel, setMesSel] = useState(MES_ATUAL)
+  const [inicio, setInicio] = useState(() => `${MES_ATUAL}-01`)
+  const [fim, setFim] = useState(() => new Date().toISOString().slice(0, 10))
 
-  // New Record Dialog
-  const [openModal, setOpenModal] = useState(false)
-  const [tipo, setTipo] = useState<'receita' | 'despesa'>('receita')
-  const [descricao, setDescricao] = useState('')
-  const [valor, setValor] = useState<number>(0)
-  const [data, setData] = useState(new Date().toISOString().slice(0, 10))
-  const [categoria, setCategoria] = useState('Procedimentos Cirúrgicos')
-  const [clienteId, setClienteId] = useState('')
-  const [contratoId, setContratoId] = useState('')
+  // lançamentos
+  const [aba, setAba] = useState<Aba>('visao')
+  const [filtroTipo, setFiltroTipo] = useState<'todos' | 'receita' | 'despesa'>('todos')
+  const [busca, setBusca] = useState('')
 
-  // NF Dialog
-  const [openNfModal, setOpenNfModal] = useState(false)
-  const [selectedReg, setSelectedReg] = useState<RegistroFinanceiro | null>(null)
-  const [nfEmail, setNfEmail] = useState('financeiro@institutoromani.com.br')
-  const [nfObs, setNfObs] = useState('')
-  const [sendingNf, setSendingNf] = useState(false)
-  const [nfMessage, setNfMessage] = useState<string | null>(null)
+  // diálogos
+  const [dialogoAberto, setDialogoAberto] = useState(false)
+  const [editando, setEditando] = useState<RegistroFinanceiro | null>(null)
+  const [nfRegistro, setNfRegistro] = useState<RegistroFinanceiro | null>(null)
+  const [nfAberto, setNfAberto] = useState(false)
+  const [salvando, setSalvando] = useState(false)
+
+  const meses = useMemo(opcoesMes, [])
 
   useEffect(() => {
-    loadAll()
+    carregar()
   }, [])
 
-  const loadAll = async () => {
+  const carregar = async () => {
     setLoading(true)
+    setErro('')
     try {
-      const fin = await financeiroService.list('', '-data,-created')
-      const clis = await clientesService.list('', 'nome')
-      const conts = await contratosService.list('', '-created')
+      const [fin, cls] = await Promise.all([financeiroService.list(), clientesService.list()])
       setRegistros(fin)
-      setClientes(clis)
-      setContratos(conts)
+      setClientes(cls)
     } catch (err) {
-      console.error('Erro ao carregar financeiro:', err)
+      console.error(err)
+      setErro(getErrorMessage(err) || 'Não foi possível carregar os dados financeiros.')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!descricao || valor <= 0) return
-
-    const mesReferencia = data.slice(0, 7)
-    await financeiroService.create({
-      tipo,
-      descricao,
-      valor: Number(valor),
-      data,
-      categoria,
-      mes_referencia: mesReferencia,
-      cliente: clienteId || undefined,
-      contrato: contratoId || undefined,
-      nf_solicitada: false,
-    })
-
-    setOpenModal(false)
-    setDescricao('')
-    setValor(0)
-    setClienteId('')
-    setContratoId('')
-    await loadAll()
-  }
-
-  const handleDelete = async (id: string) => {
-    if (confirm('Deseja excluir este lançamento financeiro?')) {
-      await financeiroService.delete(id)
-      await loadAll()
+  const janela: JanelaPeriodo = useMemo(() => {
+    if (modo === 'tudo') return { modo: 'tudo', inicio: '', fim: '' }
+    if (modo === 'mes') return { modo: 'mes', inicio: mesSel, fim: '' }
+    return {
+      modo: 'intervalo',
+      inicio: inicio || `${MES_ATUAL}-01`,
+      fim: fim || new Date().toISOString().slice(0, 10),
     }
+  }, [modo, mesSel, inicio, fim])
+
+  const filtrados = useMemo(() => filtrarPorJanela(registros, janela), [registros, janela])
+  const filtradosAnterior = useMemo(
+    () => filtrarPorJanela(registros, janelaAnterior(janela)),
+    [registros, janela],
+  )
+
+  const totais = useMemo(() => totaisDe(filtrados), [filtrados])
+  const totaisAnterior = useMemo(() => totaisDe(filtradosAnterior), [filtradosAnterior])
+
+  const serie = useMemo(() => serieMensal(filtrados, janela), [filtrados, janela])
+
+  const receitasCat = useMemo(() => receitasPorCategoria(filtrados), [filtrados])
+  const despesasCat = useMemo(() => despesasPorCategoria(filtrados), [filtrados])
+  const procedimentos = useMemo(() => valorPorProcedimento(filtrados), [filtrados])
+
+  const kpis: KpiFinanceiro[] = [
+    {
+      titulo: 'Receitas',
+      valor: totais.receitas,
+      tipo: 'receita',
+      variacao: variacaoPct(totais.receitas, totaisAnterior.receitas),
+      subtitulo: modo === 'tudo' ? 'histórico completo' : 'vs. período anterior',
+    },
+    {
+      titulo: 'Despesas',
+      valor: totais.despesas,
+      tipo: 'despesa',
+      variacao: variacaoPct(totais.despesas, totaisAnterior.despesas),
+      invertido: true,
+      subtitulo: modo === 'tudo' ? 'histórico completo' : 'vs. período anterior',
+    },
+    {
+      titulo: 'Lucro bruto',
+      valor: totais.lucroBruto,
+      tipo: 'lucro',
+      variacao: variacaoPct(totais.lucroBruto, totaisAnterior.lucroBruto),
+    },
+    {
+      titulo: 'Lucro líquido',
+      valor: totais.lucroLiquido,
+      tipo: 'lucro',
+      variacao: variacaoPct(totais.lucroLiquido, totaisAnterior.lucroLiquido),
+      subtitulo: `margem ${totais.margem.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`,
+    },
+  ]
+
+  const lancamentos = useMemo(() => {
+    let lista = [...filtrados]
+    if (filtroTipo !== 'todos') lista = lista.filter((r) => r.tipo === filtroTipo)
+    if (busca.trim()) {
+      const q = busca.trim().toLowerCase()
+      lista = lista.filter(
+        (r) =>
+          r.descricao?.toLowerCase().includes(q) ||
+          (r.categoria || '').toLowerCase().includes(q) ||
+          (r.expand?.cliente?.nome || '').toLowerCase().includes(q),
+      )
+    }
+    return lista.sort((a, b) => (b.data || '').localeCompare(a.data || ''))
+  }, [filtrados, filtroTipo, busca])
+
+  const abrirNovo = () => {
+    setEditando(null)
+    setDialogoAberto(true)
+  }
+  const abrirEdicao = (r: RegistroFinanceiro) => {
+    setEditando(r)
+    setDialogoAberto(true)
   }
 
-  const handleOpenNfModal = (reg: RegistroFinanceiro) => {
-    setSelectedReg(reg)
-    setNfEmail(reg.nf_email_destinatario || 'financeiro@institutoromani.com.br')
-    setNfObs('')
-    setNfMessage(null)
-    setOpenNfModal(true)
-  }
-
-  const handleSendNf = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selectedReg) return
-
-    setSendingNf(true)
-    setNfMessage(null)
+  const salvarLancamento = async (form: FormLancamento) => {
+    setSalvando(true)
     try {
-      await financeiroService.solicitarNf(selectedReg.id, nfEmail, nfObs)
-      setNfMessage('E-mail de solicitação de Nota Fiscal disparado com sucesso!')
-      setTimeout(() => {
-        setOpenNfModal(false)
-        loadAll()
-      }, 1500)
-    } catch (err: any) {
-      alert(err.message || 'Falha ao solicitar emissão de NF')
+      const payload: Partial<RegistroFinanceiro> = {
+        tipo: form.tipo,
+        descricao: form.descricao.trim(),
+        valor: Number(form.valor),
+        data: form.data,
+        categoria: form.categoria,
+        mes_referencia: form.mes_referencia,
+        cliente: form.cliente === 'none' ? '' : form.cliente,
+      }
+      if (editando) {
+        await financeiroService.update(editando.id, payload)
+        toast({ title: 'Lançamento atualizado' })
+      } else {
+        await financeiroService.create(payload)
+        toast({ title: 'Lançamento registrado' })
+      }
+      setDialogoAberto(false)
+      setEditando(null)
+      await carregar()
+    } catch (err) {
+      toast({
+        title: 'Erro ao salvar lançamento',
+        description: getErrorMessage(err),
+        variant: 'destructive',
+      })
     } finally {
-      setSendingNf(false)
+      setSalvando(false)
     }
   }
 
-  // Filtered
-  const filtered = registros.filter((r) => {
-    const matchMes = !mesFiltro || r.data.startsWith(mesFiltro) || r.mes_referencia === mesFiltro
-    const matchTipo = tipoFiltro === 'todos' || r.tipo === tipoFiltro
-    return matchMes && matchTipo
-  })
+  const excluirLancamento = async (r: RegistroFinanceiro) => {
+    if (!confirm(`Excluir o lançamento "${r.descricao}"?`)) return
+    try {
+      await financeiroService.delete(r.id)
+      toast({ title: 'Lançamento excluído' })
+      await carregar()
+    } catch (err) {
+      toast({ title: 'Erro ao excluir', description: getErrorMessage(err), variant: 'destructive' })
+    }
+  }
 
-  // Totals for filtered month
-  const totalReceitas = filtered
-    .filter((r) => r.tipo === 'receita')
-    .reduce((acc, curr) => acc + Number(curr.valor), 0)
-
-  const totalDespesas = filtered
-    .filter((r) => r.tipo === 'despesa')
-    .reduce((acc, curr) => acc + Number(curr.valor), 0)
-
-  const lucroLiquido = totalReceitas - totalDespesas
-  const margem = totalReceitas > 0 ? Math.round((lucroLiquido / totalReceitas) * 100) : 0
+  const marcarNf = (id: string, email: string) => {
+    setRegistros((rs) =>
+      rs.map((r) =>
+        r.id === id ? { ...r, nf_solicitada: true, nf_email_destinatario: email } : r,
+      ),
+    )
+    setNfAberto(false)
+    setNfRegistro(null)
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-xl border border-slate-200/80 shadow-sm">
+      {/* Cabeçalho */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-            <DollarSign className="h-6 w-6 text-emerald-600" />
-            Controle Financeiro Mensal
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Receitas de procedimentos, despesas clínicas, cálculo de lucros e solicitação de Notas
-            Fiscais.
+          <h1 className="text-2xl font-bold tracking-tight text-slate-100">Controle Financeiro</h1>
+          <p className="text-xs text-slate-400 mt-1">
+            Receitas, despesas e margens da clínica — atualizado em{' '}
+            {new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}.
           </p>
         </div>
+        <Button
+          onClick={abrirNovo}
+          className="bg-sky-600 hover:bg-sky-500 text-white shadow-[0_0_18px_rgba(56,189,248,0.35)]"
+        >
+          <Plus className="h-4 w-4 mr-1" /> Novo lançamento
+        </Button>
+      </div>
 
-        <Dialog open={openModal} onOpenChange={setOpenModal}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="bg-slate-900 hover:bg-slate-800 text-white text-xs h-9">
-              <Plus className="h-4 w-4 mr-1.5" />
-              Novo Lançamento
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Novo Lançamento Financeiro</DialogTitle>
-              <DialogDescription className="text-xs">
-                Registre receitas de cirurgias ou custos operacionais.
-              </DialogDescription>
-            </DialogHeader>
+      {erro && (
+        <div className="rounded-lg border border-rose-800/60 bg-rose-950/40 p-3 text-xs text-rose-200">
+          {erro} —{' '}
+          <button onClick={carregar} className="underline font-semibold">
+            tentar novamente
+          </button>
+        </div>
+      )}
 
-            <form onSubmit={handleSave} className="space-y-3 text-xs mt-2">
-              <div className="space-y-1">
-                <Label>Tipo de Operação *</Label>
-                <Select value={tipo} onValueChange={(v: 'receita' | 'despesa') => setTipo(v)}>
-                  <SelectTrigger>
+      {/* Filtros de período */}
+      <Card className="bg-slate-900/60 border-slate-700/60 backdrop-blur">
+        <CardContent className="px-5 py-4">
+          <div className="flex flex-col lg:flex-row lg:items-end gap-4">
+            <div className="space-y-1.5 min-w-[180px]">
+              <Label className="text-[11px] uppercase tracking-wider text-slate-400">Período</Label>
+              <Select value={modo} onValueChange={(v) => setModo(v as ModoPeriodo)}>
+                <SelectTrigger className="bg-slate-800/60 border-slate-700 text-slate-100 w-[180px]">
+                  <CalendarRange className="h-4 w-4 mr-1 text-sky-400" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-900 border-slate-700 text-slate-100">
+                  <SelectItem value="mes">Por mês</SelectItem>
+                  <SelectItem value="intervalo">Intervalo personalizado</SelectItem>
+                  <SelectItem value="tudo">Todo o histórico</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {modo === 'mes' && (
+              <div className="space-y-1.5 min-w-[160px]">
+                <Label className="text-[11px] uppercase tracking-wider text-slate-400">
+                  Mês de referência
+                </Label>
+                <Select value={mesSel} onValueChange={setMesSel}>
+                  <SelectTrigger className="bg-slate-800/60 border-slate-700 text-slate-100 w-[160px]">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="receita">Receita (Entrada Financeira)</SelectItem>
-                    <SelectItem value="despesa">Despesa (Custo/Gasto Operacional)</SelectItem>
+                  <SelectContent className="bg-slate-900 border-slate-700 text-slate-100 max-h-72">
+                    {meses.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
+            )}
 
-              <div className="space-y-1">
-                <Label>Descrição *</Label>
-                <Input
-                  placeholder="Ex: Honorários Cirúrgicos, Aluguel, Insumos"
-                  value={descricao}
-                  onChange={(e) => setDescricao(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label>Valor (R$) *</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    value={valor}
-                    onChange={(e) => setValor(parseFloat(e.target.value) || 0)}
-                    required
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>Data do Lançamento *</Label>
+            {modo === 'intervalo' && (
+              <div className="flex items-end gap-3 flex-wrap">
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] uppercase tracking-wider text-slate-400">De</Label>
                   <Input
                     type="date"
-                    value={data}
-                    onChange={(e) => setData(e.target.value)}
-                    required
+                    value={inicio}
+                    onChange={(e) => setInicio(e.target.value)}
+                    className="bg-slate-800/60 border-slate-700 text-slate-100 w-[150px]"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] uppercase tracking-wider text-slate-400">Até</Label>
+                  <Input
+                    type="date"
+                    value={fim}
+                    onChange={(e) => setFim(e.target.value)}
+                    className="bg-slate-800/60 border-slate-700 text-slate-100 w-[150px]"
                   />
                 </div>
               </div>
+            )}
 
-              <div className="space-y-1">
-                <Label>Categoria</Label>
-                <Select value={categoria} onValueChange={setCategoria}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Procedimentos Cirúrgicos">
-                      Procedimentos Cirúrgicos
-                    </SelectItem>
-                    <SelectItem value="Procedimentos Ambulatoriais">
-                      Procedimentos Ambulatoriais
-                    </SelectItem>
-                    <SelectItem value="Consultas e Retornos">Consultas e Retornos</SelectItem>
-                    <SelectItem value="Insumos e Materiais">Insumos e Materiais</SelectItem>
-                    <SelectItem value="Custos Fixos / Ocupação">Custos Fixos / Ocupação</SelectItem>
-                    <SelectItem value="Equipe e Honorários">Equipe e Honorários</SelectItem>
-                    <SelectItem value="Outros">Outros</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1">
-                <Label>Paciente Relacionado (Opcional)</Label>
-                <Select value={clienteId} onValueChange={setClienteId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um paciente..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clientes.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1">
-                <Label>Contrato Relacionado (Opcional)</Label>
-                <Select value={contratoId} onValueChange={setContratoId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um contrato..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {contratos.map((ct) => (
-                      <SelectItem key={ct.id} value={ct.id}>
-                        {ct.procedimento} ({ct.data_emissao})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="pt-3 border-t flex justify-end gap-2">
-                <Button type="button" variant="ghost" onClick={() => setOpenModal(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit" className="bg-slate-900 text-white">
-                  Salvar Lançamento
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {/* Monthly Financial Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Receita Bruta */}
-        <Card className="border-slate-200 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Receita Bruta do Mês
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-slate-900">
-              R$ {totalReceitas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            <div className="lg:ml-auto flex items-center gap-2 text-xs text-slate-400">
+              <Filter className="h-3.5 w-3.5 text-sky-400" />
+              Exibindo: <span className="font-semibold text-slate-200">{modoLabel(janela)}</span>
+              <span className="text-slate-500">·</span>
+              <span>{totais.lancamentos} lançamento(s)</span>
             </div>
-            <p className="text-[11px] text-emerald-600 font-medium mt-1 flex items-center gap-1">
-              <TrendingUp className="h-3 w-3" /> Entradas financeiras
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Total Despesas */}
-        <Card className="border-slate-200 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Despesas do Mês
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-slate-900">
-              R$ {totalDespesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </div>
-            <p className="text-[11px] text-rose-600 font-medium mt-1 flex items-center gap-1">
-              <TrendingDown className="h-3 w-3" /> Custos operacionais
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Lucro Líquido */}
-        <Card className="border-slate-200 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Lucro Líquido Real
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`text-2xl font-bold ${lucroLiquido >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}
-            >
-              R$ {lucroLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </div>
-            <p className="text-[11px] text-slate-500 mt-1">Margem operacional: {margem}%</p>
-          </CardContent>
-        </Card>
-
-        {/* Total Lançamentos */}
-        <Card className="border-slate-200 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Lançamentos no Período
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-slate-900">{filtered.length}</div>
-            <p className="text-[11px] text-slate-500 mt-1">Operações contábeis filtradas</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-slate-500 font-medium">Mês de Referência:</span>
-            <Input
-              type="month"
-              value={mesFiltro}
-              onChange={(e) => setMesFiltro(e.target.value)}
-              className="w-40 h-9 text-xs"
-            />
           </div>
-
-          <Select value={tipoFiltro} onValueChange={setTipoFiltro}>
-            <SelectTrigger className="w-full sm:w-40 h-9 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os Tipos</SelectItem>
-              <SelectItem value="receita">Apenas Receitas</SelectItem>
-              <SelectItem value="despesa">Apenas Despesas</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="text-xs text-slate-500 font-medium">
-          Mostrando {filtered.length} registro(s)
-        </div>
-      </div>
-
-      {/* Registros Table */}
-      <Card className="border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-700">
-            <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-              <tr>
-                <th className="px-4 py-3">Data</th>
-                <th className="px-4 py-3">Tipo</th>
-                <th className="px-4 py-3">Descrição</th>
-                <th className="px-4 py-3">Categoria</th>
-                <th className="px-4 py-3">Paciente</th>
-                <th className="px-4 py-3">Valor</th>
-                <th className="px-4 py-3">Nota Fiscal</th>
-                <th className="px-4 py-3 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-slate-400">
-                    Nenhum lançamento no período selecionado.
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((r) => (
-                  <tr key={r.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="px-4 py-3 whitespace-nowrap font-medium text-slate-900">
-                      {r.data}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <Badge
-                        variant="outline"
-                        className={`text-[10px] uppercase font-semibold ${
-                          r.tipo === 'receita'
-                            ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                            : 'bg-rose-50 text-rose-800 border-rose-300'
-                        }`}
-                      >
-                        {r.tipo}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap font-medium text-slate-800">
-                      {r.descricao}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-slate-500">
-                      {r.categoria || '-'}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-slate-600">
-                      {r.expand?.cliente?.nome || '-'}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap font-bold text-slate-900">
-                      R$ {r.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {r.tipo === 'receita' ? (
-                        r.nf_solicitada ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                            <CheckCircle2 className="h-3 w-3" /> Solicitada
-                          </span>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleOpenNfModal(r)}
-                            className="h-7 text-[11px] border-amber-300 text-amber-800 hover:bg-amber-50"
-                          >
-                            <Mail className="h-3 w-3 mr-1 text-amber-600" />
-                            Solicitar NF
-                          </Button>
-                        )
-                      ) : (
-                        <span className="text-slate-400 text-[11px]">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-right">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleDelete(r.id)}
-                        className="h-7 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        </CardContent>
       </Card>
 
-      {/* Dialog Solicitar Emissão de Nota Fiscal por E-mail */}
-      <Dialog open={openNfModal} onOpenChange={setOpenNfModal}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Mail className="h-5 w-5 text-amber-600" />
-              Solicitar Emissão de Nota Fiscal
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              Dispara um e-mail com os dados completos do procedimento para a contabilidade da
-              clínica.
-            </DialogDescription>
-          </DialogHeader>
+      {/* KPIs */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {loading
+          ? Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-[120px] rounded-xl bg-slate-800/60" />
+            ))
+          : kpis.map((k) => <KpiCard key={k.titulo} kpi={k} />)}
+      </div>
 
-          {nfMessage ? (
-            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-xs flex items-center gap-2 font-medium">
-              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-              <span>{nfMessage}</span>
+      {/* Gráficos */}
+      <div className="space-y-6">
+        <GraficoEvolucaoMensal dados={serie} loading={loading} />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <GraficoReceitasCategoria dados={receitasCat} loading={loading} />
+          <GraficoDespesasCategoria dados={despesasCat} loading={loading} />
+        </div>
+        <GraficoProcedimentos dados={procedimentos} loading={loading} />
+      </div>
+
+      {/* Comparativo de períodos */}
+      <Card className="bg-slate-900/60 border-slate-700/60 backdrop-blur">
+        <CardHeader>
+          <CardTitle className="text-sm font-bold text-slate-100 flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 text-sky-400" />
+            Comparativo de períodos
+          </CardTitle>
+          <CardDescription className="text-xs text-slate-400">
+            Período atual <span className="text-slate-200 font-medium">
+              {modoLabel(janela)}
+            </span>{' '}
+            contra{' '}
+            <span className="text-slate-200 font-medium">
+              {janela.modo === 'tudo' ? '—' : modoLabel(janelaAnterior(janela))}
+            </span>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {janela.modo === 'tudo' ? (
+            <p className="text-xs text-slate-500">
+              Selecione um mês ou intervalo para comparar com o período anterior.
+            </p>
+          ) : (
+            <>
+              <CabecalhoComparativo rotulo="Indicador" />
+              <LinhaComparativa
+                titulo="Receitas"
+                atual={totais.receitas}
+                anterior={totaisAnterior.receitas}
+              />
+              <LinhaComparativa
+                titulo="Despesas"
+                atual={totais.despesas}
+                anterior={totaisAnterior.despesas}
+                invertido
+              />
+              <LinhaComparativa
+                titulo="Lucro bruto"
+                atual={totais.lucroBruto}
+                anterior={totaisAnterior.lucroBruto}
+              />
+              <LinhaComparativa
+                titulo="Lucro líquido"
+                atual={totais.lucroLiquido}
+                anterior={totaisAnterior.lucroLiquido}
+              />
+              <LinhaComparativa
+                titulo="Margem líquida"
+                atual={totais.margem}
+                anterior={totaisAnterior.margem}
+              />
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Lançamentos */}
+      <Card className="bg-slate-900/60 border-slate-700/60 backdrop-blur">
+        <CardHeader>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                <ListFilter className="h-4 w-4 text-sky-400" />
+                Lançamentos do período
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-400">
+                Registre, edite e solicite notas fiscais.
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                placeholder="Buscar descrição, categoria, cliente…"
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                className="bg-slate-800/60 border-slate-700 text-slate-100 h-9 w-56 text-xs placeholder:text-slate-500"
+              />
+              <Select
+                value={filtroTipo}
+                onValueChange={(v) => setFiltroTipo(v as typeof filtroTipo)}
+              >
+                <SelectTrigger className="bg-slate-800/60 border-slate-700 text-slate-100 h-9 w-[130px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-900 border-slate-700 text-slate-100">
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="receita">Receitas</SelectItem>
+                  <SelectItem value="despesa">Despesas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 rounded-lg bg-slate-800/60" />
+              ))}
+            </div>
+          ) : lancamentos.length === 0 ? (
+            <div className="p-8 text-center text-xs text-slate-500 border border-dashed border-slate-700 rounded-lg">
+              Nenhum lançamento no período/filtro selecionado.
             </div>
           ) : (
-            <form onSubmit={handleSendNf} className="space-y-3 text-xs mt-2">
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-1 text-[11px]">
-                <p>
-                  <strong>Paciente:</strong>{' '}
-                  {selectedReg?.expand?.cliente?.nome || 'Não especificado'}
-                </p>
-                <p>
-                  <strong>Descrição:</strong> {selectedReg?.descricao}
-                </p>
-                <p>
-                  <strong>Valor:</strong> R${' '}
-                  {selectedReg?.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </p>
-                <p>
-                  <strong>Data:</strong> {selectedReg?.data}
-                </p>
-              </div>
-
-              <div className="space-y-1">
-                <Label>E-mail do Destinatário (Contabilidade / Faturamento) *</Label>
-                <Input
-                  type="email"
-                  value={nfEmail}
-                  onChange={(e) => setNfEmail(e.target.value)}
-                  placeholder="contabilidade@institutoromani.com.br"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label>Observações Adicionais para a NF</Label>
-                <Input
-                  value={nfObs}
-                  onChange={(e) => setNfObs(e.target.value)}
-                  placeholder="Ex: Discriminar materiais cirúrgicos à parte"
-                />
-              </div>
-
-              <div className="pt-3 border-t flex justify-end gap-2">
-                <Button type="button" variant="ghost" onClick={() => setOpenNfModal(false)}>
-                  Cancelar
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={sendingNf}
-                  className="bg-slate-900 text-white font-medium"
-                >
-                  <Send className="h-3.5 w-3.5 mr-1.5" />
-                  {sendingNf ? 'Disparando E-mail...' : 'Enviar Solicitação'}
-                </Button>
-              </div>
-            </form>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-left text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-700">
+                    <th className="py-2 pr-3">Data</th>
+                    <th className="py-2 pr-3">Descrição</th>
+                    <th className="py-2 pr-3">Categoria</th>
+                    <th className="py-2 pr-3">Cliente</th>
+                    <th className="py-2 pr-3 text-right">Valor</th>
+                    <th className="py-2 pr-3 text-center">NF</th>
+                    <th className="py-2 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lancamentos.map((r) => (
+                    <tr
+                      key={r.id}
+                      className="border-b border-slate-800/70 hover:bg-slate-800/40 transition-colors"
+                    >
+                      <td className="py-2.5 pr-3 text-slate-300 whitespace-nowrap">
+                        {r.data ? new Date(r.data + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}
+                      </td>
+                      <td
+                        className="py-2.5 pr-3 text-slate-200 max-w-[260px] truncate"
+                        title={r.descricao}
+                      >
+                        {r.descricao}
+                      </td>
+                      <td className="py-2.5 pr-3">
+                        <Badge
+                          variant="outline"
+                          className={
+                            r.tipo === 'receita'
+                              ? 'border-emerald-700/60 bg-emerald-950/40 text-emerald-300'
+                              : 'border-rose-700/60 bg-rose-950/40 text-rose-300'
+                          }
+                        >
+                          {r.categoria || r.tipo}
+                        </Badge>
+                      </td>
+                      <td className="py-2.5 pr-3 text-slate-400 max-w-[160px] truncate">
+                        {r.expand?.cliente?.nome || '—'}
+                      </td>
+                      <td
+                        className={`py-2.5 pr-3 text-right font-bold tabular-nums whitespace-nowrap ${
+                          r.tipo === 'receita' ? 'text-emerald-300' : 'text-rose-300'
+                        }`}
+                      >
+                        {r.tipo === 'receita' ? '+' : '−'} R$ {fmtBRL(Number(r.valor) || 0)}
+                      </td>
+                      <td className="py-2.5 pr-3 text-center">
+                        {r.tipo === 'receita' ? (
+                          <button
+                            onClick={() => {
+                              setNfRegistro(r)
+                              setNfAberto(true)
+                            }}
+                            className="text-[11px] underline underline-offset-2 text-sky-300 hover:text-sky-200"
+                          >
+                            {r.nf_solicitada ? 'Solicitada' : 'Solicitar'}
+                          </button>
+                        ) : (
+                          <span className="text-slate-600">—</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 text-right whitespace-nowrap">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => abrirEdicao(r)}
+                          className="h-7 w-7 p-0 text-slate-400 hover:text-sky-300 hover:bg-slate-800"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => excluirLancamento(r)}
+                          className="h-7 w-7 p-0 text-slate-400 hover:text-rose-300 hover:bg-slate-800"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
-        </DialogContent>
-      </Dialog>
+        </CardContent>
+      </Card>
+
+      <DialogoLancamento
+        open={dialogoAberto}
+        editando={editando}
+        clientes={clientes}
+        categoriasReceita={CATEGORIAS_RECEITA}
+        categoriasDespesa={CATEGORIAS_DESPESA}
+        onClose={() => {
+          setDialogoAberto(false)
+          setEditando(null)
+        }}
+        onSave={salvarLancamento}
+      />
+      <DialogoNotaFiscal
+        registro={nfRegistro}
+        open={nfAberto}
+        onClose={() => {
+          setNfAberto(false)
+          setNfRegistro(null)
+        }}
+        onSolicitada={marcarNf}
+      />
     </div>
   )
 }
