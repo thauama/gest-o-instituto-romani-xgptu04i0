@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-10T20:46:14.593Z",
+  "generatedAt": "2026-11-10T21:05:48.690Z",
   "collections": [
     {
       "name": "users",
@@ -246,6 +246,24 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "validade",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "procedimentos",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "quantidade_por_procedimento",
+          "type": "json",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
