@@ -9,6 +9,7 @@ import type {
   Consulta,
   RegistroFinanceiro,
 } from '@/types/clinic'
+import type { UserProfile } from '@/hooks/use-auth'
 
 // Clientes Service
 export const clientesService = {
@@ -204,5 +205,40 @@ export const financeiroService = {
       throw new Error(payload?.error || 'Falha ao solicitar emissão de Nota Fiscal')
     }
     return payload
+  },
+}
+
+// Usuários / Permissões Service (somente admin — garantido pelas regras da coleção users)
+export const usuariosService = {
+  async list(sort = '-created') {
+    return await pb.collection('users').getFullList<UserProfile>({
+      sort,
+      fields: 'id,name,email,role,is_active,verified,created,updated',
+    })
+  },
+  async create(data: { name: string; email: string; password: string; role: 'admin' | 'equipe' }) {
+    return await pb.collection('users').create<UserProfile>({
+      name: data.name.trim(),
+      email: data.email.trim(),
+      password: data.password,
+      passwordConfirm: data.password,
+      role: data.role,
+      is_active: true,
+      verified: true, // admin cria já verificado para login imediato
+    })
+  },
+  async update(id: string, data: Partial<UserProfile> & { password?: string }) {
+    const payload: Record<string, unknown> = {}
+    if (data.name !== undefined) payload.name = data.name
+    if (data.role !== undefined) payload.role = data.role
+    if (data.is_active !== undefined) payload.is_active = data.is_active
+    if (data.password) {
+      payload.password = data.password
+      payload.passwordConfirm = data.password
+    }
+    return await pb.collection('users').update<UserProfile>(id, payload)
+  },
+  async remove(id: string) {
+    return await pb.collection('users').delete(id)
   },
 }

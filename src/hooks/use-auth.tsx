@@ -7,6 +7,7 @@ export interface UserProfile extends RecordModel {
   name: string
   role: 'admin' | 'equipe'
   avatar?: string
+  is_active?: boolean
 }
 
 interface AuthContextType {
@@ -55,7 +56,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signIn = async (email: string, pass: string) => {
     try {
       const res = await pb.collection('users').authWithPassword(email.trim(), pass)
-      setUser(res.record as UserProfile)
+      const record = res.record as UserProfile
+      // Bloqueio extra no cliente: conta desativada não entra
+      // (o backend também bloqueia via hook onRecordAuthRequest)
+      if (record && record.is_active === false) {
+        pb.authStore.clear()
+        return {
+          error: {
+            message: 'Este acesso está desativado. Procure o administrador da clínica.',
+          },
+        }
+      }
+      setUser(record)
       setToken(res.token)
       return { error: null }
     } catch (err: any) {
@@ -76,6 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         passwordConfirm: pass,
         name: name.trim(),
         role: userRole,
+        is_active: true,
       })
       try {
         await pb.collection('users').requestVerification(email.trim())

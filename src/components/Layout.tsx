@@ -40,6 +40,7 @@ export default function Layout() {
     ...(isAdmin
       ? [{ name: 'Controle Financeiro', path: '/financeiro', icon: DollarSign, badge: 'Admin' }]
       : []),
+    ...(isAdmin ? [{ name: 'Permissões', path: '/usuarios', icon: Shield, badge: 'Admin' }] : []),
     { name: 'Assistente de Gestão IA', path: '/chat-ia', icon: Bot, highlight: true },
   ]
 

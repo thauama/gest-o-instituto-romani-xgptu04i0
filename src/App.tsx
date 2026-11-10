@@ -17,6 +17,7 @@ import Itens from './pages/Itens'
 import Movimentacoes from './pages/Movimentacoes'
 import ContratosOrcamentos from './pages/ContratosOrcamentos'
 import Financeiro from './pages/Financeiro'
+import Permissoes from './pages/Permissoes'
 import ChatIA from './pages/ChatIA'
 import NotFound from './pages/NotFound'
 
@@ -52,6 +53,14 @@ const App = () => (
               element={
                 <ProtectedRoute requireAdmin={true}>
                   <Financeiro />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/usuarios"
+              element={
+                <ProtectedRoute requireAdmin={true}>
+                  <Permissoes />
                 </ProtectedRoute>
               }
             />
