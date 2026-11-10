@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-10T20:30:47.054Z",
+  "generatedAt": "2026-11-10T20:46:14.593Z",
   "collections": [
     {
       "name": "users",
@@ -316,6 +316,12 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "registrado_por",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": ["CREATE INDEX idx_movimentacoes_data ON movimentacoes (data)"]

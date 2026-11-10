@@ -40,6 +40,7 @@ export interface Movimentacao {
   cliente?: string
   quantidade: number
   observacao?: string
+  registrado_por?: string
   expand?: {
     item?: ItemEstoque
     cliente?: Cliente

@@ -11,6 +11,7 @@ import {
   financeiroService,
 } from '@/services/clinic'
 import type { ItemEstoque, Movimentacao, Contrato, Consulta } from '@/types/clinic'
+import { nivelEstoque } from '@/lib/estoque'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -62,7 +63,8 @@ export default function Resumo() {
 
       // Fetch Itens & identify low stock
       const items = await itensService.list()
-      const lowStock = items.filter((it) => it.quantidade <= (it.estoque_minimo || 0))
+      // Mesmo critério de nível da tela Estoque (src/lib/estoque.ts)
+      const lowStock = items.filter((it) => nivelEstoque(it) !== 'ok')
       setItensFalta(lowStock)
 
       // Fetch Movimentacoes
@@ -351,7 +353,7 @@ export default function Resumo() {
               size="sm"
               className="text-xs text-amber-700 hover:text-amber-800"
             >
-              <Link to="/itens">Gerenciar Estoque</Link>
+              <Link to="/estoque">Abrir Controle de Estoque</Link>
             </Button>
           </CardHeader>
           <CardContent className="space-y-3">

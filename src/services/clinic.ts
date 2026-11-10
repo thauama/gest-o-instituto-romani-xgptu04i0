@@ -63,6 +63,11 @@ export const movimentacoesService = {
     })
   },
   async create(data: Partial<Movimentacao>) {
+    // Auditoria: quem registrou (nome do usuário logado, com fallback para o e-mail)
+    const auth = pb.authStore.record as { name?: string; email?: string } | null
+    if (!data.registrado_por) {
+      data.registrado_por = auth?.name || auth?.email || '—'
+    }
     const record = await pb.collection('movimentacoes').create<Movimentacao>(data)
     // Adjust inventory if linked to item
     if (data.item && data.quantidade) {

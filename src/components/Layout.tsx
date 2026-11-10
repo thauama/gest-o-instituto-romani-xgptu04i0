@@ -9,6 +9,7 @@ import {
   FileText,
   DollarSign,
   ArrowLeftRight,
+  Warehouse,
   Bot,
   LogOut,
   Menu,
@@ -35,6 +36,7 @@ export default function Layout() {
     { name: 'Clientes & Pacientes', path: '/clientes', icon: Users },
     { name: 'Itens & Estoque', path: '/itens', icon: Package },
     { name: 'Movimentações', path: '/movimentacoes', icon: ArrowLeftRight },
+    { name: 'Controle de Estoque', path: '/estoque', icon: Warehouse },
     { name: 'Contratos & Orçamentos', path: '/contratos', icon: FileText },
     // Only Admin can see full financial
     ...(isAdmin

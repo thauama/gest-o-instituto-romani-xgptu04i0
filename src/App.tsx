@@ -15,6 +15,7 @@ import Clientes from './pages/Clientes'
 import PreCadastroPaciente from './pages/PreCadastroPaciente'
 import Itens from './pages/Itens'
 import Movimentacoes from './pages/Movimentacoes'
+import Estoque from './pages/Estoque'
 import ContratosOrcamentos from './pages/ContratosOrcamentos'
 import Financeiro from './pages/Financeiro'
 import Permissoes from './pages/Permissoes'
@@ -47,6 +48,7 @@ const App = () => (
             <Route path="/clientes" element={<Clientes />} />
             <Route path="/itens" element={<Itens />} />
             <Route path="/movimentacoes" element={<Movimentacoes />} />
+            <Route path="/estoque" element={<Estoque />} />
             <Route path="/contratos" element={<ContratosOrcamentos />} />
             <Route
               path="/financeiro"
