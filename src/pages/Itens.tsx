@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from 'react'
 import { itensService } from '@/services/clinic'
 import type { ItemEstoque } from '@/types/clinic'
+import { PROCEDIMENTOS_CLINICA } from '@/lib/procedimentos'
+import { alertaValidade, ALERTA_VALIDADE_CLASSE, ALERTA_VALIDADE_LABEL } from '@/lib/estoque'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -21,7 +24,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Package, Search, Plus, Edit, Trash2, AlertTriangle, Layers, Sparkles } from 'lucide-react'
+import {
+  Package,
+  Search,
+  Plus,
+  Edit,
+  Trash2,
+  AlertTriangle,
+  Layers,
+  Sparkles,
+  CalendarClock,
+} from 'lucide-react'
 
 export default function Itens() {
   const [itens, setItens] = useState<ItemEstoque[]>([])
@@ -41,6 +54,8 @@ export default function Itens() {
   const [estoqueMinimo, setEstoqueMinimo] = useState<number>(1)
   const [unidade, setUnidade] = useState('un')
   const [descricao, setDescricao] = useState('')
+  const [validade, setValidade] = useState('')
+  const [procedimentosSel, setProcedimentosSel] = useState<string[]>([])
 
   useEffect(() => {
     loadItens()
@@ -67,6 +82,8 @@ export default function Itens() {
     setEstoqueMinimo(1)
     setUnidade('un')
     setDescricao('')
+    setValidade('')
+    setProcedimentosSel([])
     setOpenModal(true)
   }
 
@@ -79,7 +96,13 @@ export default function Itens() {
     setEstoqueMinimo(it.estoque_minimo || 0)
     setUnidade(it.unidade || 'un')
     setDescricao(it.descricao || '')
+    setValidade(it.validade || '')
+    setProcedimentosSel(Array.isArray(it.procedimentos) ? it.procedimentos : [])
     setOpenModal(true)
+  }
+
+  const toggleProcedimento = (p: string) => {
+    setProcedimentosSel((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]))
   }
 
   const handleSave = async (e: React.FormEvent) => {
@@ -94,6 +117,9 @@ export default function Itens() {
       estoque_minimo: Number(estoqueMinimo) || 0,
       unidade,
       descricao,
+      // '' e [] limpam o campo no banco (permitem remover validade/vínculos ao editar)
+      validade,
+      procedimentos: procedimentosSel,
     }
 
     if (editingItem) {
@@ -121,6 +147,19 @@ export default function Itens() {
     return matchSearch && matchTipo
   })
 
+  const badgeValidade = (it: ItemEstoque) => {
+    const alerta = alertaValidade(it)
+    if (alerta === 'ok' || !it.validade) return null
+    return (
+      <Badge
+        variant="outline"
+        className={`text-[10px] font-semibold border ${ALERTA_VALIDADE_CLASSE[alerta]}`}
+      >
+        {alerta === 'vencido' ? 'Vencido' : 'Vence em 60 dias'}
+      </Badge>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -131,7 +170,8 @@ export default function Itens() {
             Catálogo de Itens & Estoque
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Cadastro de produtos, peças cirúrgicas e serviços com controle de quantidade e preço.
+            Cadastro de produtos, peças cirúrgicas e serviços com controle de quantidade, preço,
+            validade e procedimentos.
           </p>
         </div>
 
@@ -196,7 +236,7 @@ export default function Itens() {
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <CardTitle className="text-sm font-bold text-slate-900">{it.nome}</CardTitle>
-                      <div className="flex items-center gap-2 mt-1">
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
                         <Badge
                           variant="secondary"
                           className="text-[10px] capitalize bg-slate-100 text-slate-700"
@@ -211,6 +251,7 @@ export default function Itens() {
                             <AlertTriangle className="h-3 w-3" /> Reposição
                           </Badge>
                         )}
+                        {badgeValidade(it)}
                       </div>
                     </div>
                   </div>
@@ -218,6 +259,38 @@ export default function Itens() {
                 <CardContent className="p-4 pt-2 space-y-3 text-xs text-slate-600">
                   {it.descricao && (
                     <p className="text-[11px] text-slate-500 line-clamp-2">{it.descricao}</p>
+                  )}
+
+                  {it.validade && (
+                    <div className="flex items-center gap-1.5 text-[11px] text-slate-600">
+                      <CalendarClock className="h-3.5 w-3.5 text-amber-600" />
+                      Validade:{' '}
+                      <strong className="text-slate-800">
+                        {new Date(`${it.validade}T12:00:00`).toLocaleDateString('pt-BR')}
+                      </strong>
+                    </div>
+                  )}
+
+                  {(it.procedimentos?.length || 0) > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {it.procedimentos!.slice(0, 3).map((p) => (
+                        <Badge
+                          key={p}
+                          variant="outline"
+                          className="text-[9px] border-sky-200 text-sky-700 bg-sky-50"
+                        >
+                          {p}
+                        </Badge>
+                      ))}
+                      {(it.procedimentos!.length || 0) > 3 && (
+                        <Badge
+                          variant="outline"
+                          className="text-[9px] border-slate-200 text-slate-600"
+                        >
+                          +{it.procedimentos!.length - 3}
+                        </Badge>
+                      )}
+                    </div>
                   )}
 
                   <div className="grid grid-cols-2 gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-100 text-[11px]">
@@ -274,11 +347,12 @@ export default function Itens() {
 
       {/* Modal Dialog Form */}
       <Dialog open={openModal} onOpenChange={setOpenModal}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingItem ? 'Editar Item' : 'Cadastrar Item'}</DialogTitle>
             <DialogDescription className="text-xs">
-              Informe o tipo de item (produto, peça ou serviço), quantidade e valor.
+              Informe o tipo de item (produto, peça ou serviço), quantidade, valor, validade e
+              procedimentos.
             </DialogDescription>
           </DialogHeader>
 
@@ -355,6 +429,47 @@ export default function Itens() {
                   value={estoqueMinimo}
                   onChange={(e) => setEstoqueMinimo(parseInt(e.target.value, 10) || 0)}
                 />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="i-validade" className="flex items-center gap-1.5">
+                <CalendarClock className="h-3.5 w-3.5 text-amber-600" />
+                Validade
+              </Label>
+              <Input
+                id="i-validade"
+                type="date"
+                value={validade}
+                onChange={(e) => setValidade(e.target.value)}
+              />
+              <p className="text-[10px] text-slate-500">
+                Opcional. Alerta automático de vencido e vencendo nos próximos 60 dias.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5">
+                <Layers className="h-3.5 w-3.5 text-amber-600" />
+                Usado nos procedimentos
+              </Label>
+              <p className="text-[10px] text-slate-500">
+                Marque os procedimentos em que este material é utilizado — ao emitir o contrato, ele
+                entra automaticamente no checklist.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 rounded-lg border border-slate-200 bg-slate-50/60">
+                {PROCEDIMENTOS_CLINICA.map((p) => (
+                  <label
+                    key={p}
+                    className="flex items-center gap-2 text-[11px] text-slate-700 cursor-pointer hover:text-slate-900"
+                  >
+                    <Checkbox
+                      checked={procedimentosSel.includes(p)}
+                      onCheckedChange={() => toggleProcedimento(p)}
+                    />
+                    {p}
+                  </label>
+                ))}
               </div>
             </div>
 

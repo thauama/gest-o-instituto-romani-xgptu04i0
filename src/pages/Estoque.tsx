@@ -11,6 +11,8 @@ import {
   Search,
   TrendingDown,
   TrendingUp,
+  FileText,
+  CalendarClock,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -36,7 +38,10 @@ import {
   totaisEstoque,
   type EstoqueItem,
   type NivelEstoque,
+  type AlertaValidade,
+  ALERTA_VALIDADE_CLASSE,
 } from '@/lib/estoque'
+import { RelatorioEstoque } from '@/components/estoque/RelatorioEstoque'
 import { cn } from '@/lib/utils'
 
 type FiltroSituacao = 'todos' | NivelEstoque
@@ -271,6 +276,7 @@ export default function Estoque() {
   const [filtroSituacao, setFiltroSituacao] = useState<FiltroSituacao>('todos')
   const [itemHistorico, setItemHistorico] = useState<EstoqueItem | null>(null)
   const [itemAjuste, setItemAjuste] = useState<EstoqueItem | null>(null)
+  const [relatorioAberto, setRelatorioAberto] = useState(false)
 
   const carregar = async () => {
     // Checklist carregado em paralelo e sem falhar a tela: se não houver
@@ -323,12 +329,20 @@ export default function Estoque() {
   return (
     <div className="space-y-6">
       {/* Cabeçalho */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-100">Estoque de Materiais</h1>
-        <p className="text-sm text-slate-400">
-          Visão consolidada por material, com níveis, reservas de contratos, valor em estoque e
-          histórico de movimentações.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-100">Estoque de Materiais</h1>
+          <p className="text-sm text-slate-400">
+            Visão consolidada por material, com níveis, reservas de contratos, valor em estoque e
+            histórico de movimentações.
+          </p>
+        </div>
+        <Button
+          onClick={() => setRelatorioAberto(true)}
+          className="bg-sky-600 hover:bg-sky-500 text-white gap-2"
+        >
+          <FileText className="h-4 w-4" /> Relatório de estoque
+        </Button>
       </div>
 
       {/* KPIs */}
@@ -497,6 +511,44 @@ export default function Estoque() {
                       >
                         {item.nome}
                       </button>
+                      <div className="flex flex-wrap items-center gap-1 mt-1">
+                        {item.validade && (
+                          <Badge
+                            variant="outline"
+                            className={cn('gap-1', ALERTA_VALIDADE_CLASSE[item.validadeAlerta])}
+                            title={
+                              item.validade ? `Validade: ${formataData(item.validade)}` : undefined
+                            }
+                          >
+                            <CalendarClock className="h-3 w-3" />
+                            {item.validadeAlerta === 'vencido'
+                              ? `Vencido ${formataData(item.validade!)}`
+                              : item.validadeAlerta === 'vencendo'
+                                ? `Vence ${formataData(item.validade!)}`
+                                : `Val. ${formataData(item.validade)}`}
+                          </Badge>
+                        )}
+                        {(item.procedimentos?.length || 0) > 0 &&
+                          (item.procedimentos!.length <= 2 ? (
+                            item.procedimentos!.map((p) => (
+                              <Badge
+                                key={p}
+                                variant="outline"
+                                className="border-sky-500/40 bg-sky-500/10 text-sky-300 text-[10px]"
+                              >
+                                {p}
+                              </Badge>
+                            ))
+                          ) : (
+                            <Badge
+                              variant="outline"
+                              className="border-sky-500/40 bg-sky-500/10 text-sky-300 text-[10px]"
+                              title={item.procedimentos!.join(', ')}
+                            >
+                              {item.procedimentos![0]} +{item.procedimentos!.length - 1}
+                            </Badge>
+                          ))}
+                      </div>
                       {item.descricao && (
                         <p className="text-[11px] text-slate-400 line-clamp-1">{item.descricao}</p>
                       )}
@@ -593,6 +645,13 @@ export default function Estoque() {
           onSalvo={carregar}
         />
       )}
+
+      <RelatorioEstoque
+        aberto={relatorioAberto}
+        onAbrir={setRelatorioAberto}
+        itens={itens}
+        checklist={checklist}
+      />
     </div>
   )
 }

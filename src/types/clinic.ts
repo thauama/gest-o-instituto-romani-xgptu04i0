@@ -28,6 +28,12 @@ export interface ItemEstoque {
   estoque_minimo: number
   unidade?: string
   descricao?: string
+  /** Validade do lote (date, 'YYYY-MM-DD') — migração 0007. */
+  validade?: string
+  /** Procedimentos aos quais o material serve — migração 0007 (json, array de strings). */
+  procedimentos?: string[]
+  /** Quantidade consumida por procedimento (json: { [procedimento]: number }). */
+  quantidade_por_procedimento?: Record<string, number>
   created: string
   updated: string
 }

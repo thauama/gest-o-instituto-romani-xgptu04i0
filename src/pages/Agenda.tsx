@@ -33,7 +33,10 @@ import {
   Stethoscope,
   CalendarDays,
   ExternalLink,
+  AlertTriangle,
+  Link2,
 } from 'lucide-react'
+import { toast } from '@/hooks/use-toast'
 
 export default function Agenda() {
   const [consultas, setConsultas] = useState<Consulta[]>([])
@@ -42,6 +45,7 @@ export default function Agenda() {
   const [googleStatus, setGoogleStatus] = useState<string>('not_connected')
   const [syncingGoogle, setSyncingGoogle] = useState(false)
   const [googleEvents, setGoogleEvents] = useState<any[]>([])
+  const [erroGoogle, setErroGoogle] = useState<string | null>(null)
 
   // Modal State
   const [openModal, setOpenModal] = useState(false)
@@ -106,10 +110,22 @@ export default function Agenda() {
         const items = raw?.items || raw?.response_data?.items || []
         setGoogleEvents(items)
       } else if (!r.successful) {
-        console.warn('Falha no Google Calendar:', r.error)
+        setErroGoogle(r.error || 'Falha na comunicação com o Google Calendar.')
+        toast({
+          variant: 'destructive',
+          title: 'Sincronização falhou',
+          description: 'Não foi possível buscar os eventos do Google Calendar. Verifique a conexão e tente novamente.',
+        })
+      } else {
+        setErroGoogle(null)
       }
     } catch (err) {
-      console.warn('Erro ao sincronizar Google Calendar:', err)
+      setErroGoogle('Erro inesperado ao sincronizar com o Google Calendar.')
+      toast({
+        variant: 'destructive',
+        title: 'Erro de sincronização',
+        description: 'Erro inesperado ao sincronizar com o Google Calendar.',
+      })
     } finally {
       setSyncingGoogle(false)
     }
@@ -178,6 +194,20 @@ export default function Agenda() {
     if (!filtroData) return true
     return c.data === filtroData
   })
+
+  // Eventos do Google consolidados: só os que existem no Google e não
+  // correspondem a nenhuma consulta já registrada no app.
+  const eventosGoogleVisiveis = googleEvents
+    .filter((ev) => {
+      const start = ev?.start?.dateTime || ev?.start?.date
+      return start && !consultas.some((c) => c.google_event_id && c.google_event_id === ev.id)
+    })
+    .sort((a, b) =>
+      String(a?.start?.dateTime || a?.start?.date || '').localeCompare(
+        String(b?.start?.dateTime || b?.start?.date || ''),
+      ),
+    )
+    .slice(0, 20)
 
   return (
     <div className="space-y-6">
@@ -313,6 +343,44 @@ export default function Agenda() {
         </div>
       </div>
 
+      {/* Aviso quando o Google Calendar não está conectado */}
+      {googleStatus !== 'connected' && (
+        <Card className="border-amber-300 bg-amber-50/70 shadow-sm">
+          <CardContent className="p-4 flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-amber-900">
+                Conecte o Google Calendar da clínica
+              </p>
+              <p className="text-xs text-amber-800 mt-0.5">
+                Sem a conexão, as consultas ficam somente na agenda do app: não entram no calendário
+                do Dr. Pedro Ivo Romani nem aparecem aqui os compromissos criados direto no Google.
+                Clique em <span className="font-semibold">"Conectar"</span> ao lado e autorize a
+                conta Google da clínica — é rápido e só precisa fazer uma vez.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Erro de sincronização amigável */}
+      {erroGoogle && (
+        <Card className="border-rose-200 bg-rose-50/70 shadow-sm">
+          <CardContent className="p-4 flex items-start gap-3">
+            <XCircle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-rose-900">
+                Não foi possível falar com o Google Calendar agora
+              </p>
+              <p className="text-xs text-rose-800 mt-0.5">
+                {erroGoogle} As consultas do app continuam normais — tente sincronizar novamente em
+                alguns instantes.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Google Calendar Integration Status Card */}
       <Card className="border-slate-200 shadow-sm bg-gradient-to-r from-slate-900/5 to-amber-500/5">
         <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -374,10 +442,54 @@ export default function Agenda() {
           </div>
           <span className="text-xs text-slate-500">
             {filteredConsultas.length} consulta(s) encontrada(s)
+            {eventosGoogleVisiveis.length > 0 &&
+              ` · ${eventosGoogleVisiveis.length} evento(s) do Google Calendar`}
           </span>
-        </div>
+       {/* Eventos do Google Calendar (fora do app) */}
+       {eventosGoogleVisiveis.length > 0 && (
+         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+           {eventosGoogleVisiveis.map((ev) => {
+             const start = ev?.start?.dateTime || ev?.start?.date
+             const d = start ? new Date(start) : null
+             const soData = Boolean(ev?.start?.date) && !ev?.start?.dateTime
+             const hora = d && !soData ? d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : null
+             return (
+               <Card key={ev.id} className="border border-blue-200 bg-blue-50/30 shadow-sm">
+                 <CardHeader className="p-4 pb-2">
+                   <div className="flex items-start justify-between gap-2">
+                     <div>
+                       <CardTitle className="text-sm font-bold text-slate-900 line-clamp-1">
+                         {ev.summary || 'Compromisso no Google Calendar'}
+                       </CardTitle>
+                       <p className="text-[11px] text-blue-700 font-medium mt-0.5">
+                         Evento do Google Calendar
+                       </p>
+                     </div>
+                     <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 text-[10px] uppercase font-semibold">
+                       Google
+                     </Badge>
+                   </div>
+                 </CardHeader>
+                 <CardContent className="p-4 pt-2 space-y-2 text-xs text-slate-600">
+                   <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                     <Clock className="h-3.5 w-3.5 text-blue-600" />
+                     <span className="text-slate-800 font-semibold">
+                       {d ? d.toLocaleDateString('pt-BR') : '—'}
+                       {hora ? ` às ${hora}` : ' (dia inteiro)'}
+                     </span>
+                   </div>
+                   {ev.location && <p className="text-[11px] text-slate-500">Local: {ev.location}</p>}
+                   {ev.description && (
+                     <p className="text-[11px] text-slate-500 italic line-clamp-2">{ev.description}</p>
+                   )}
+                 </CardContent>
+               </Card>
+             )
+           })}
+         </div>
+       )}
 
-        {/* Consultas Table / List */}
+       {/* Consultas Table / List */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredConsultas.length === 0 ? (
             <div className="col-span-full p-12 text-center border border-dashed rounded-xl bg-white text-xs text-slate-500">

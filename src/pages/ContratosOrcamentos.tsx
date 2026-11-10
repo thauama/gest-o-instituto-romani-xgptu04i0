@@ -28,6 +28,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { PROCEDIMENTOS_CLINICA, PROCEDIMENTO_OUTRO } from '@/lib/procedimentos'
+import { materiaisDoProcedimento } from '@/lib/estoque'
 import {
   FileText,
   AlertTriangle,
@@ -65,6 +67,8 @@ export default function ContratosOrcamentos() {
   const [cPrevisao, setCPrevisao] = useState('')
   const [cSituacao, setCSituacao] = useState<'assinado' | 'pendente'>('assinado')
   const [cObs, setCObs] = useState('')
+  const [cProcedimentoOutro, setCProcedimentoOutro] = useState(false)
+  const [materiaisSugeridos, setMateriaisSugeridos] = useState<ItemEstoque[]>([])
 
   // New Orçamento Modal
   const [openOrcamentoModal, setOpenOrcamentoModal] = useState(false)
@@ -150,7 +154,6 @@ export default function ContratosOrcamentos() {
   const handleCreateContrato = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!cClienteId || !cProcedimento) return
-
     const cont = await contratosService.create({
       cliente: cClienteId,
       procedimento: cProcedimento,
@@ -178,8 +181,35 @@ export default function ContratosOrcamentos() {
       situacao: 'pendente',
     })
 
+    // Materiais vinculados ao procedimento entram automaticamente no checklist
+    // (tolerante a falha: erro aqui nunca bloqueia a criação do contrato)
+    try {
+      const sugeridos = materiaisDoProcedimento(itens, cProcedimento)
+      await Promise.all(
+        sugeridos.map((it) =>
+          checklistService.create({
+            contrato: cont.id,
+            item: it.id,
+            descricao: it.nome,
+            situacao: 'pendente',
+            quantidade: quantidadeParaProcedimento(it, cProcedimento) || 1,
+          }),
+        ),
+      )
+      if (sugeridos.length > 0) {
+        toast({
+          title: 'Materiais adicionados ao checklist',
+          description: `${sugeridos.length} material(is) vinculado(s) a "${cProcedimento}" entrou(entraram) no checklist.`,
+        })
+      }
+    } catch (err) {
+      console.warn('Falha ao sugerir materiais no checklist (contrato criado):', err)
+    }
+
     setOpenContratoModal(false)
     setCProcedimento('')
+    setCProcedimentoOutro(false)
+    setMateriaisSugeridos([])
     setCValor(0)
     setCObs('')
     await loadAll()

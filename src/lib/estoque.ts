@@ -55,11 +55,62 @@ export function reservasPorItem(checklist: ChecklistItem[]): Map<string, number>
   return mapa
 }
 
+/** Janela padrão do alerta de validade: vence nos próximos 60 dias. */
+export const DIAS_ALERTA_VALIDADE = 60
+
+/**
+ * Regra central de alerta de validade (tela Estoque + painel Resumo):
+ * - vencido: a data de validade já passou
+ * - vencendo: vence nos próximos 60 dias (inclusive hoje)
+ * - ok: sem validade informada ou dentro do prazo
+ */
+export type AlertaValidade = 'vencido' | 'vencendo' | 'ok'
+
+/** Normaliza uma data 'YYYY-MM-DD' (ou ISO completa) para comparação por dia. */
+const inicioDoDia = (iso: string) => {
+  const d = new Date(iso.length <= 10 ? `${iso}T00:00:00` : iso)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+export function alertaValidade(
+  item: Pick<ItemEstoque, 'validade'>,
+  hoje: Date = new Date(),
+): AlertaValidade {
+  if (!item.validade) return 'ok'
+  const limite = new Date(hoje)
+  limite.setHours(0, 0, 0, 0)
+  limite.setDate(limite.getDate() + DIAS_ALERTA_VALIDADE)
+  const data = inicioDoDia(item.validade)
+  if (Number.isNaN(data.getTime())) return 'ok'
+  if (data < inicioDoDia(hoje.toISOString())) return 'vencido'
+  if (data <= limite) return 'vencendo'
+  return 'ok'
+}
+
+export const ALERTA_VALIDADE_LABEL: Record<AlertaValidade, string> = {
+  vencido: 'Vencido',
+  vencendo: 'Vence em breve',
+  ok: 'Na validade',
+}
+
+export const ALERTA_VALIDADE_CLASSE: Record<AlertaValidade, string> = {
+  vencido: 'bg-rose-500/15 text-rose-300 border-rose-500/40',
+  vencendo: 'bg-amber-500/15 text-amber-300 border-amber-500/40',
+  ok: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40',
+}
+
+/** Itens com validade vencida ou vencendo na janela de 60 dias. */
+export function itensEmAlertaValidade(itens: ItemEstoque[]): ItemEstoque[] {
+  return itens.filter((i) => alertaValidade(i) !== 'ok')
+}
+
 export interface EstoqueItem extends ItemEstoque {
   reservado: number
   disponivel: number
   nivel: NivelEstoque
   valorTotal: number
+  validadeAlerta: AlertaValidade
 }
 
 /** Monta a visão consolidada por material (quantidade, reserva, disponível, nível, valor). */
@@ -74,6 +125,7 @@ export function consolidarEstoque(itens: ItemEstoque[], checklist: ChecklistItem
       disponivel: Math.max(0, quantidade - reservado),
       nivel: nivelEstoque(item),
       valorTotal: quantidade * (Number(item.preco) || 0),
+      validadeAlerta: alertaValidade(item),
     }
   })
 }
@@ -85,6 +137,8 @@ export interface TotaisEstoque {
   baixos: number
   ok: number
   itensAtivos: number
+  vencidos: number
+  vencendo: number
 }
 
 export function totaisEstoque(itens: EstoqueItem[]): TotaisEstoque {
@@ -95,6 +149,8 @@ export function totaisEstoque(itens: EstoqueItem[]): TotaisEstoque {
     baixos: itens.filter((i) => i.nivel === 'baixo').length,
     ok: itens.filter((i) => i.nivel === 'ok').length,
     itensAtivos: itens.filter((i) => i.tipo !== 'servico').length,
+    vencidos: itens.filter((i) => i.validadeAlerta === 'vencido').length,
+    vencendo: itens.filter((i) => i.validadeAlerta === 'vencendo').length,
   }
 }
 
