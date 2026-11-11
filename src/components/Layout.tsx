@@ -19,6 +19,7 @@ import {
   UserCheck,
   ChevronRight,
   TrendingUp,
+  ClipboardList,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -41,6 +42,9 @@ export default function Layout() {
     // Only Admin can see full financial
     ...(isAdmin
       ? [{ name: 'Controle Financeiro', path: '/financeiro', icon: DollarSign, badge: 'Admin' }]
+      : []),
+    ...(isAdmin
+      ? [{ name: 'Prontuário', path: '/prontuario', icon: ClipboardList, badge: 'Admin' }]
       : []),
     ...(isAdmin ? [{ name: 'Permissões', path: '/usuarios', icon: Shield, badge: 'Admin' }] : []),
     { name: 'Assistente de Gestão IA', path: '/chat-ia', icon: Bot, highlight: true },

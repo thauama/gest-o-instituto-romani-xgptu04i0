@@ -11,7 +11,12 @@ import {
   financeiroService,
 } from '@/services/clinic'
 import type { ItemEstoque, Movimentacao, Contrato, Consulta } from '@/types/clinic'
-import { nivelEstoque } from '@/lib/estoque'
+import {
+  alertaValidade,
+  itensEmAlertaValidade,
+  nivelEstoque,
+  ALERTA_VALIDADE_LABEL,
+} from '@/lib/estoque'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -27,6 +32,7 @@ import {
   PlusCircle,
   Clock,
   Sparkles,
+  CalendarClock,
 } from 'lucide-react'
 
 export default function Resumo() {
@@ -36,6 +42,7 @@ export default function Resumo() {
   const [totalClientes, setTotalClientes] = useState(0)
   const [totalConsultasHoje, setTotalConsultasHoje] = useState(0)
   const [itensFalta, setItensFalta] = useState<ItemEstoque[]>([])
+  const [itensValidade, setItensValidade] = useState<ItemEstoque[]>([])
   const [ultimasMovimentacoes, setUltimasMovimentacoes] = useState<Movimentacao[]>([])
   const [contratosAlerta, setContratosAlerta] = useState<Contrato[]>([])
   const [consultasProximas, setConsultasProximas] = useState<Consulta[]>([])
@@ -66,6 +73,9 @@ export default function Resumo() {
       // Mesmo critério de nível da tela Estoque (src/lib/estoque.ts)
       const lowStock = items.filter((it) => nivelEstoque(it) !== 'ok')
       setItensFalta(lowStock)
+      // Mesmo critério de validade da tela Estoque (src/lib/estoque.ts):
+      // vencido = data passada, vencendo = vence em até 60 dias
+      setItensValidade(itensEmAlertaValidade(items))
 
       // Fetch Movimentacoes
       const movs = await movimentacoesService.list('', '-created')
@@ -281,7 +291,7 @@ export default function Resumo() {
         </Card>
       )}
 
-      {/* Main Grid: Alertas de Contratos e Itens em Falta */}
+      {/* Main Grid: Alertas de Contratos, Itens em Falta e Validade */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Alerta de Contratos com mais de 1 ano */}
         <Card className="border-slate-200 shadow-sm">
@@ -365,7 +375,11 @@ export default function Resumo() {
               itensFalta.map((it) => (
                 <div
                   key={it.id}
-                  className="flex items-center justify-between p-3 rounded-lg border border-amber-200 bg-amber-50/30 text-xs"
+                  className={`flex items-center justify-between p-3 rounded-lg border text-xs ${
+                    alertaValidade(it) === 'vencido'
+                      ? 'border-rose-200 bg-rose-50/40'
+                      : 'border-amber-200 bg-amber-50/30'
+                  }`}
                 >
                   <div>
                     <p className="font-semibold text-slate-900">{it.nome}</p>
@@ -381,6 +395,103 @@ export default function Resumo() {
                 </div>
               ))
             )}
+          </CardContent>
+        </Card>
+
+        {/* Card Validade de Estoque — mesmo critério de alertaValidade (lib/estoque.ts) */}
+        <Card
+          className={`shadow-sm transition-colors ${
+            itensValidade.length > 0 ? 'border-amber-300 bg-amber-50/20' : 'border-slate-200'
+          }`}
+        >
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <div>
+              <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <CalendarClock className="h-4 w-4 text-amber-600" />
+                Validade de Estoque
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-500">
+                Materiais vencidos ou vencendo nos próximos 60 dias
+              </CardDescription>
+            </div>
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="text-xs text-amber-700 hover:text-amber-800"
+            >
+              <Link to="/estoque">Abrir Estoque</Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {(() => {
+              const vencidos = itensValidade.filter((it) => alertaValidade(it) === 'vencido')
+              const vencendo = itensValidade.filter((it) => alertaValidade(it) === 'vencendo')
+              if (itensValidade.length === 0) {
+                return (
+                  <div className="p-6 text-center text-xs text-slate-500 border border-dashed rounded-lg bg-slate-50">
+                    Nenhum material vencido ou próximo do vencimento.
+                  </div>
+                )
+              }
+              return (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-3 rounded-lg border border-rose-200 bg-rose-50/40 text-center">
+                      <p className="text-lg font-bold text-rose-700">{vencidos.length}</p>
+                      <p className="text-[10px] uppercase tracking-wider text-rose-600 font-semibold">
+                        Vencidos
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-lg border border-amber-200 bg-amber-50/40 text-center">
+                      <p className="text-lg font-bold text-amber-700">{vencendo.length}</p>
+                      <p className="text-[10px] uppercase tracking-wider text-amber-600 font-semibold">
+                        Vencendo (60d)
+                      </p>
+                    </div>
+                  </div>
+                  {[...vencidos, ...vencendo].slice(0, 4).map((it) => {
+                    const alerta = alertaValidade(it)
+                    const venceu = alerta === 'vencido'
+                    return (
+                      <div
+                        key={it.id}
+                        className={`flex items-center justify-between p-3 rounded-lg border text-xs ${
+                          venceu
+                            ? 'border-rose-200 bg-rose-50/40'
+                            : 'border-amber-200 bg-amber-50/30'
+                        }`}
+                      >
+                        <div>
+                          <p className="font-semibold text-slate-900">{it.nome}</p>
+                          <p className="text-[11px] text-slate-500">
+                            {venceu ? 'Venceu em' : 'Vence em'}{' '}
+                            {it.validade
+                              ? new Date(`${it.validade}T12:00:00`).toLocaleDateString('pt-BR')
+                              : '—'}
+                            {` · ${it.quantidade} ${it.unidade || 'un'} em estoque`}
+                          </p>
+                        </div>
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
+                            venceu
+                              ? 'bg-rose-100 text-rose-800 border-rose-300'
+                              : 'bg-amber-100 text-amber-800 border-amber-300'
+                          }`}
+                        >
+                          {ALERTA_VALIDADE_LABEL[alerta]}
+                        </span>
+                      </div>
+                    )
+                  })}
+                  {itensValidade.length > 4 && (
+                    <p className="text-[11px] text-slate-500 text-center">
+                      + {itensValidade.length - 4} material(is) no mesmo critério.
+                    </p>
+                  )}
+                </>
+              )
+            })()}
           </CardContent>
         </Card>
       </div>

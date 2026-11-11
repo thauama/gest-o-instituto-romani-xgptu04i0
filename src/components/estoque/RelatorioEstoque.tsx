@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils'
  * Relatório de estoque: posição atual consolidada, reservas por contrato,
  * data de emissão e download CSV. Somente leitura — nada aqui grava dados.
  */
-export default function RelatorioEstoque({
+export function RelatorioEstoque({
   aberto,
   onAbrir,
   itens,
@@ -143,15 +143,13 @@ export default function RelatorioEstoque({
         '',
       ]
       const csv = [
-        ['Relatório de Estoque — Instituto Romani'],
-        ['Emitido em', emitidoEm],
-        [''],
-        header,
+        'Relatório de Estoque — Instituto Romani',
+        ['Emitido em', emitidoEm].map(esc).join(';'),
+        '',
+        header.join(';'),
         ...linhasCsv,
-        totalizador,
-      ]
-        .map((r) => r.join(';'))
-        .join('\n')
+        totalizador.map(esc).join(';'),
+      ].join('\n')
 
       const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
       const url = URL.createObjectURL(blob)

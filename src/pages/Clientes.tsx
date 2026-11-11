@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '@/hooks/use-auth'
 import { clientesService } from '@/services/clinic'
 import type { Cliente } from '@/types/clinic'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -28,9 +30,12 @@ import {
   CheckCircle2,
   Clock,
   Instagram,
+  ClipboardList,
 } from 'lucide-react'
 
 export default function Clientes() {
+  const navigate = useNavigate()
+  const { isAdmin } = useAuth()
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -333,6 +338,18 @@ export default function Clientes() {
                     <Edit className="h-3.5 w-3.5 mr-1" />
                     Editar Ficha
                   </Button>
+                  {isAdmin && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => navigate(`/prontuario?paciente=${c.id}`)}
+                      className="h-8 text-xs text-slate-700"
+                      title="Abrir prontuário do paciente (LGPD)"
+                    >
+                      <ClipboardList className="h-3.5 w-3.5 mr-1" />
+                      Prontuário
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="ghost"

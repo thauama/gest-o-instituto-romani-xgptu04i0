@@ -18,6 +18,7 @@ import Movimentacoes from './pages/Movimentacoes'
 import Estoque from './pages/Estoque'
 import ContratosOrcamentos from './pages/ContratosOrcamentos'
 import Financeiro from './pages/Financeiro'
+import Prontuario from './pages/Prontuario'
 import Permissoes from './pages/Permissoes'
 import ChatIA from './pages/ChatIA'
 import NotFound from './pages/NotFound'
@@ -50,9 +51,17 @@ const App = () => (
             <Route path="/movimentacoes" element={<Movimentacoes />} />
             <Route path="/estoque" element={<Estoque />} />
             <Route path="/contratos" element={<ContratosOrcamentos />} />
-            <Route
-              path="/financeiro"
-              element={
+           <Route
+             path="/prontuario"
+             element={
+               <ProtectedRoute requireAdmin={true}>
+                 <Prontuario />
+               </ProtectedRoute>
+             }
+           />
+           <Route
+             path="/financeiro"
+             element={
                 <ProtectedRoute requireAdmin={true}>
                   <Financeiro />
                 </ProtectedRoute>

@@ -213,7 +213,6 @@ export default function ContratosOrcamentos() {
     setOpenContratoModal(false)
     setCProcedimento('')
     setCProcedimentoOutro(false)
-    setMateriaisSugeridos([])
     setCValor(0)
     setCObs('')
     await loadAll()
