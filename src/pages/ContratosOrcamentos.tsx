@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
   contratosService,
   orcamentosService,
@@ -29,7 +29,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { PROCEDIMENTOS_CLINICA, PROCEDIMENTO_OUTRO } from '@/lib/procedimentos'
-import { materiaisDoProcedimento } from '@/lib/estoque'
+import { materiaisDoProcedimento, quantidadeParaProcedimento } from '@/lib/estoque'
+import { toast } from '@/hooks/use-toast'
 import {
   FileText,
   AlertTriangle,
@@ -64,11 +65,14 @@ export default function ContratosOrcamentos() {
   const [cProcedimento, setCProcedimento] = useState('')
   const [cValor, setCValor] = useState<number>(0)
   const [cDataEmissao, setCDataEmissao] = useState(new Date().toISOString().slice(0, 10))
+  const [cProcedimentoOutro, setCProcedimentoOutro] = useState(false)
+  const materiaisSugeridos = useMemo(
+    () => materiaisDoProcedimento(itens, cProcedimento),
+    [itens, cProcedimento],
+  )
   const [cPrevisao, setCPrevisao] = useState('')
   const [cSituacao, setCSituacao] = useState<'assinado' | 'pendente'>('assinado')
   const [cObs, setCObs] = useState('')
-  const [cProcedimentoOutro, setCProcedimentoOutro] = useState(false)
-  const [materiaisSugeridos, setMateriaisSugeridos] = useState<ItemEstoque[]>([])
 
   // New Orçamento Modal
   const [openOrcamentoModal, setOpenOrcamentoModal] = useState(false)
@@ -608,12 +612,61 @@ export default function ContratosOrcamentos() {
 
             <div className="space-y-1">
               <Label>Procedimento Cirúrgico *</Label>
-              <Input
-                placeholder="Ex: Mastopexia com Prótese, Rinoplastia, Lipoaspiração"
+              <Select
                 value={cProcedimento}
-                onChange={(e) => setCProcedimento(e.target.value)}
+                onValueChange={(v) => {
+                  if (v === PROCEDIMENTO_OUTRO) {
+                    setCProcedimentoOutro(true)
+                    setCProcedimento('')
+                  } else {
+                    setCProcedimentoOutro(false)
+                    setCProcedimento(v)
+                  }
+                }}
                 required
-              />
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o procedimento" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROCEDIMENTOS_CLINICA.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {p}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value={PROCEDIMENTO_OUTRO}>Outro (descrever)</SelectItem>
+                </SelectContent>
+              </Select>
+              {cProcedimentoOutro && (
+                <Input
+                  placeholder="Descreva o procedimento (ex: Mastopexia com Prótese)"
+                  value={cProcedimento}
+                  onChange={(e) => setCProcedimento(e.target.value)}
+                  className="mt-1.5"
+                  required
+                />
+              )}
+              {!cProcedimentoOutro && materiaisSugeridos.length > 0 && (
+                <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50/50 p-2.5">
+                  <p className="text-[11px] font-semibold text-amber-800">
+                    {materiaisSugeridos.length} material(is) vinculado(s) — entrarão automaticamente
+                    no checklist:
+                  </p>
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {materiaisSugeridos.map((m) => (
+                      <Badge
+                        key={m.id}
+                        variant="outline"
+                        className="text-[10px] bg-white border-amber-300 text-amber-900"
+                      >
+                        {m.nome}
+                        {quantidadeParaProcedimento(m, cProcedimento) > 1 &&
+                          ` ×${quantidadeParaProcedimento(m, cProcedimento)}`}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">

@@ -58,6 +58,26 @@ export function reservasPorItem(checklist: ChecklistItem[]): Map<string, number>
 /** Janela padrão do alerta de validade: vence nos próximos 60 dias. */
 export const DIAS_ALERTA_VALIDADE = 60
 
+/** Quantidade consumida de um item em um procedimento (json quantidade_por_procedimento). */
+export function quantidadeParaProcedimento(
+  item: Pick<ItemEstoque, 'quantidade_por_procedimento'>,
+  procedimento: string,
+): number {
+  const mapa = item.quantidade_por_procedimento
+  if (!mapa || typeof mapa !== 'object') return 0
+  const valor = (mapa as Record<string, unknown>)[procedimento]
+  const n = Number(valor)
+  return Number.isFinite(n) && n > 0 ? n : 0
+}
+
+/** Materiais (itens) vinculados ao procedimento informado, em ordem de nome. */
+export function materiaisDoProcedimento(itens: ItemEstoque[], procedimento: string): ItemEstoque[] {
+  if (!procedimento) return []
+  return itens
+    .filter((i) => Array.isArray(i.procedimentos) && i.procedimentos.includes(procedimento))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+}
+
 /**
  * Regra central de alerta de validade (tela Estoque + painel Resumo):
  * - vencido: a data de validade já passou

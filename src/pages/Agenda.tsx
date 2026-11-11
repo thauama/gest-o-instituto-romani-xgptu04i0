@@ -30,11 +30,8 @@ import {
   RefreshCw,
   CheckCircle2,
   XCircle,
-  Stethoscope,
   CalendarDays,
-  ExternalLink,
   AlertTriangle,
-  Link2,
 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 
@@ -114,7 +111,8 @@ export default function Agenda() {
         toast({
           variant: 'destructive',
           title: 'Sincronização falhou',
-          description: 'Não foi possível buscar os eventos do Google Calendar. Verifique a conexão e tente novamente.',
+          description:
+            'Não foi possível buscar os eventos do Google Calendar. Verifique a conexão e tente novamente.',
         })
       } else {
         setErroGoogle(null)
@@ -445,51 +443,62 @@ export default function Agenda() {
             {eventosGoogleVisiveis.length > 0 &&
               ` · ${eventosGoogleVisiveis.length} evento(s) do Google Calendar`}
           </span>
-       {/* Eventos do Google Calendar (fora do app) */}
-       {eventosGoogleVisiveis.length > 0 && (
-         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-           {eventosGoogleVisiveis.map((ev) => {
-             const start = ev?.start?.dateTime || ev?.start?.date
-             const d = start ? new Date(start) : null
-             const soData = Boolean(ev?.start?.date) && !ev?.start?.dateTime
-             const hora = d && !soData ? d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : null
-             return (
-               <Card key={ev.id} className="border border-blue-200 bg-blue-50/30 shadow-sm">
-                 <CardHeader className="p-4 pb-2">
-                   <div className="flex items-start justify-between gap-2">
-                     <div>
-                       <CardTitle className="text-sm font-bold text-slate-900 line-clamp-1">
-                         {ev.summary || 'Compromisso no Google Calendar'}
-                       </CardTitle>
-                       <p className="text-[11px] text-blue-700 font-medium mt-0.5">
-                         Evento do Google Calendar
-                       </p>
-                     </div>
-                     <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 text-[10px] uppercase font-semibold">
-                       Google
-                     </Badge>
-                   </div>
-                 </CardHeader>
-                 <CardContent className="p-4 pt-2 space-y-2 text-xs text-slate-600">
-                   <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                     <Clock className="h-3.5 w-3.5 text-blue-600" />
-                     <span className="text-slate-800 font-semibold">
-                       {d ? d.toLocaleDateString('pt-BR') : '—'}
-                       {hora ? ` às ${hora}` : ' (dia inteiro)'}
-                     </span>
-                   </div>
-                   {ev.location && <p className="text-[11px] text-slate-500">Local: {ev.location}</p>}
-                   {ev.description && (
-                     <p className="text-[11px] text-slate-500 italic line-clamp-2">{ev.description}</p>
-                   )}
-                 </CardContent>
-               </Card>
-             )
-           })}
-         </div>
-       )}
+        </div>
+        {/* Eventos do Google Calendar (fora do app) */}
+        {eventosGoogleVisiveis.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {eventosGoogleVisiveis.map((ev) => {
+              const start = ev?.start?.dateTime || ev?.start?.date
+              const d = start ? new Date(start) : null
+              const soData = Boolean(ev?.start?.date) && !ev?.start?.dateTime
+              const hora =
+                d && !soData
+                  ? d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+                  : null
+              return (
+                <Card key={ev.id} className="border border-blue-200 bg-blue-50/30 shadow-sm">
+                  <CardHeader className="p-4 pb-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <CardTitle className="text-sm font-bold text-slate-900 line-clamp-1">
+                          {ev.summary || 'Compromisso no Google Calendar'}
+                        </CardTitle>
+                        <p className="text-[11px] text-blue-700 font-medium mt-0.5">
+                          Evento do Google Calendar
+                        </p>
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className="bg-blue-50 text-blue-800 border-blue-200 text-[10px] uppercase font-semibold"
+                      >
+                        Google
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-2 space-y-2 text-xs text-slate-600">
+                    <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                      <Clock className="h-3.5 w-3.5 text-blue-600" />
+                      <span className="text-slate-800 font-semibold">
+                        {d ? d.toLocaleDateString('pt-BR') : '—'}
+                        {hora ? ` às ${hora}` : ' (dia inteiro)'}
+                      </span>
+                    </div>
+                    {ev.location && (
+                      <p className="text-[11px] text-slate-500">Local: {ev.location}</p>
+                    )}
+                    {ev.description && (
+                      <p className="text-[11px] text-slate-500 italic line-clamp-2">
+                        {ev.description}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        )}
 
-       {/* Consultas Table / List */}
+        {/* Consultas Table / List */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredConsultas.length === 0 ? (
             <div className="col-span-full p-12 text-center border border-dashed rounded-xl bg-white text-xs text-slate-500">
