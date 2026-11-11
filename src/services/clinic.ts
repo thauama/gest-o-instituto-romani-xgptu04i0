@@ -252,171 +252,185 @@ export const financeiroService = {
 
 /** Registra um acesso/ação no prontuário (create-only — a coleção não aceita update/delete). */
 async function registrarAuditoria(
- paciente: string,
- acao: 'visualizacao' | 'criacao' | 'edicao' | 'impressao' | 'download' | 'reemissao',
- detalhe?: string,
+  paciente: string,
+  acao: 'visualizacao' | 'criacao' | 'edicao' | 'impressao' | 'download' | 'reemissao',
+  detalhe?: string,
 ) {
- try {
-   const auth = pb.authStore.record as { id?: string; name?: string; email?: string } | null
-   await pb.collection('prontuario_auditoria').create({
-     paciente,
-     acao,
-     detalhe: detalhe || '',
-     usuario: auth?.name || auth?.email || '—',
-     usuario_id: auth?.id || '',
-   })
- } catch (err) {
-   // Auditoria nunca deve quebrar o fluxo clínico; falha fica registrada no console.
-   console.warn('Falha ao registrar auditoria do prontuário:', err)
- }
+  try {
+    const auth = pb.authStore.record as { id?: string; name?: string; email?: string } | null
+    await pb.collection('prontuario_auditoria').create({
+      paciente,
+      acao,
+      detalhe: detalhe || '',
+      usuario: auth?.name || auth?.email || '—',
+      usuario_id: auth?.id || '',
+    })
+  } catch (err) {
+    // Auditoria nunca deve quebrar o fluxo clínico; falha fica registrada no console.
+    console.warn('Falha ao registrar auditoria do prontuário:', err)
+  }
 }
 
 export const prontuarioService = {
- auditoria: registrarAuditoria,
+  auditoria: registrarAuditoria,
 
- urlArquivo: (registro: { id: string; collectionId?: string; collectionName?: string }, nome: string) =>
-   pb.files.getURL(
-     { id: registro.id, collectionId: registro.collectionId || 'prontuario_arquivos', collectionName: registro.collectionName || 'prontuario_arquivos' },
-     nome,
-   ),
+  urlArquivo: (
+    registro: { id: string; collectionId?: string; collectionName?: string },
+    nome: string,
+  ) =>
+    pb.files.getURL(
+      {
+        id: registro.id,
+        collectionId: registro.collectionId || 'prontuario_arquivos',
+        collectionName: registro.collectionName || 'prontuario_arquivos',
+      },
+      nome,
+    ),
 
- // ---- Modelos de anamnese ----
- async listarModelosAnamnese() {
-   return await pb.collection('prontuario_modelos_anamnese').getFullList<ModeloAnamnese>({
-     filter: 'ativo = true',
-     sort: 'nome',
-   })
- },
- async criarModeloAnamnese(data: Partial<ModeloAnamnese>) {
-   return await pb.collection('prontuario_modelos_anamnese').create<ModeloAnamnese>(data)
- },
- async atualizarModeloAnamnese(id: string, data: Partial<ModeloAnamnese>) {
-   return await pb.collection('prontuario_modelos_anamnese').update<ModeloAnamnese>(id, data)
- },
- async excluirModeloAnamnese(id: string) {
-   return await pb.collection('prontuario_modelos_anamnese').delete(id)
- },
+  // ---- Modelos de anamnese ----
+  async listarModelosAnamnese() {
+    return await pb.collection('prontuario_modelos_anamnese').getFullList<ModeloAnamnese>({
+      filter: 'ativo = true',
+      sort: 'nome',
+    })
+  },
+  async criarModeloAnamnese(data: Partial<ModeloAnamnese>) {
+    return await pb.collection('prontuario_modelos_anamnese').create<ModeloAnamnese>(data)
+  },
+  async atualizarModeloAnamnese(id: string, data: Partial<ModeloAnamnese>) {
+    return await pb.collection('prontuario_modelos_anamnese').update<ModeloAnamnese>(id, data)
+  },
+  async excluirModeloAnamnese(id: string) {
+    return await pb.collection('prontuario_modelos_anamnese').delete(id)
+  },
 
- // ---- Anamnese ----
- async listarAnamnese(paciente: string) {
-   return await pb
-     .collection('prontuario_anamnese')
-     .getFullList<Anamnese>({ filter: `paciente = "${paciente}"`, sort: '-updated', expand: 'modelo' })
- },
- async criarAnamnese(data: Partial<Anamnese>) {
-   const rec = await pb.collection('prontuario_anamnese').create<Anamnese>(data)
-   await registrarAuditoria(data.paciente || rec.paciente, 'criacao', `Anamnese: ${rec.titulo}`)
-   return rec
- },
- async atualizarAnamnese(id: string, data: Partial<Anamnese> & { paciente?: string }) {
-   const rec = await pb.collection('prontuario_anamnese').update<Anamnese>(id, data)
-   if (data.paciente) await registrarAuditoria(data.paciente, 'edicao', `Anamnese: ${rec.titulo}`)
-   return rec
- },
- async excluirAnamnese(id: string, paciente?: string) {
-   if (paciente) await registrarAuditoria(paciente, 'edicao', `Anamnese excluída (${id})`)
-   return await pb.collection('prontuario_anamnese').delete(id)
- },
+  // ---- Anamnese ----
+  async listarAnamnese(paciente: string) {
+    return await pb.collection('prontuario_anamnese').getFullList<Anamnese>({
+      filter: `paciente = "${paciente}"`,
+      sort: '-updated',
+      expand: 'modelo',
+    })
+  },
+  async criarAnamnese(data: Partial<Anamnese>) {
+    const rec = await pb.collection('prontuario_anamnese').create<Anamnese>(data)
+    await registrarAuditoria(data.paciente || rec.paciente, 'criacao', `Anamnese: ${rec.titulo}`)
+    return rec
+  },
+  async atualizarAnamnese(id: string, data: Partial<Anamnese> & { paciente?: string }) {
+    const rec = await pb.collection('prontuario_anamnese').update<Anamnese>(id, data)
+    if (data.paciente) await registrarAuditoria(data.paciente, 'edicao', `Anamnese: ${rec.titulo}`)
+    return rec
+  },
+  async excluirAnamnese(id: string, paciente?: string) {
+    if (paciente) await registrarAuditoria(paciente, 'edicao', `Anamnese excluída (${id})`)
+    return await pb.collection('prontuario_anamnese').delete(id)
+  },
 
- // ---- Observações ----
- async listarObservacoes(paciente: string) {
-   return await pb
-     .collection('prontuario_observacoes')
-     .getFullList<ObservacaoPaciente>({ filter: `paciente = "${paciente}"`, sort: '-created' })
- },
- async criarObservacao(data: Partial<ObservacaoPaciente>) {
-   const rec = await pb.collection('prontuario_observacoes').create<ObservacaoPaciente>(data)
-   await registrarAuditoria(data.paciente || rec.paciente, 'criacao', 'Observação adicionada')
-   return rec
- },
- async excluirObservacao(id: string, paciente?: string) {
-   if (paciente) await registrarAuditoria(paciente, 'edicao', `Observação excluída (${id})`)
-   return await pb.collection('prontuario_observacoes').delete(id)
- },
+  // ---- Observações ----
+  async listarObservacoes(paciente: string) {
+    return await pb
+      .collection('prontuario_observacoes')
+      .getFullList<ObservacaoPaciente>({ filter: `paciente = "${paciente}"`, sort: '-created' })
+  },
+  async criarObservacao(data: Partial<ObservacaoPaciente>) {
+    const rec = await pb.collection('prontuario_observacoes').create<ObservacaoPaciente>(data)
+    await registrarAuditoria(data.paciente || rec.paciente, 'criacao', 'Observação adicionada')
+    return rec
+  },
+  async excluirObservacao(id: string, paciente?: string) {
+    if (paciente) await registrarAuditoria(paciente, 'edicao', `Observação excluída (${id})`)
+    return await pb.collection('prontuario_observacoes').delete(id)
+  },
 
- // ---- Evolução (transcrição colada do Plaud + anexo opcional) ----
- async listarEvolucao(paciente: string) {
-   return await pb
-     .collection('prontuario_evolucao')
-     .getFullList<EvolucaoPaciente>({ filter: `paciente = "${paciente}"`, sort: '-data,-created' })
- },
- async criarEvolucao(data: Partial<EvolucaoPaciente>) {
-   const rec = await pb.collection('prontuario_evolucao').create<EvolucaoPaciente>(data)
-   await registrarAuditoria(data.paciente || rec.paciente, 'criacao', `Evolução: ${rec.titulo || rec.data}`)
-   return rec
- },
- async excluirEvolucao(id: string, paciente?: string) {
-   if (paciente) await registrarAuditoria(paciente, 'edicao', `Evolução excluída (${id})`)
-   return await pb.collection('prontuario_evolucao').delete(id)
- },
+  // ---- Evolução (transcrição colada do Plaud + anexo opcional) ----
+  async listarEvolucao(paciente: string) {
+    return await pb
+      .collection('prontuario_evolucao')
+      .getFullList<EvolucaoPaciente>({ filter: `paciente = "${paciente}"`, sort: '-data,-created' })
+  },
+  async criarEvolucao(data: Partial<EvolucaoPaciente>) {
+    const rec = await pb.collection('prontuario_evolucao').create<EvolucaoPaciente>(data)
+    await registrarAuditoria(
+      data.paciente || rec.paciente,
+      'criacao',
+      `Evolução: ${rec.titulo || rec.data}`,
+    )
+    return rec
+  },
+  async excluirEvolucao(id: string, paciente?: string) {
+    if (paciente) await registrarAuditoria(paciente, 'edicao', `Evolução excluída (${id})`)
+    return await pb.collection('prontuario_evolucao').delete(id)
+  },
 
- // ---- Arquivos (fotos, exames, contratos, orçamentos, vídeos) ----
- async listarArquivos(paciente: string) {
-   return await pb
-     .collection('prontuario_arquivos')
-     .getFullList<ArquivoPaciente>({ filter: `paciente = "${paciente}"`, sort: '-created' })
- },
- async criarArquivo(data: Partial<ArquivoPaciente>) {
-   const rec = await pb.collection('prontuario_arquivos').create<ArquivoPaciente>(data)
-   await registrarAuditoria(data.paciente || rec.paciente, 'criacao', `Arquivo: ${rec.titulo}`)
-   return rec
- },
- async excluirArquivo(id: string, paciente?: string) {
-   if (paciente) await registrarAuditoria(paciente, 'edicao', `Arquivo excluído (${id})`)
-   return await pb.collection('prontuario_arquivos').delete(id)
- },
+  // ---- Arquivos (fotos, exames, contratos, orçamentos, vídeos) ----
+  async listarArquivos(paciente: string) {
+    return await pb
+      .collection('prontuario_arquivos')
+      .getFullList<ArquivoPaciente>({ filter: `paciente = "${paciente}"`, sort: '-created' })
+  },
+  async criarArquivo(data: Partial<ArquivoPaciente> | FormData) {
+    const rec = await pb.collection('prontuario_arquivos').create<ArquivoPaciente>(data)
+    const pacienteId =
+      data instanceof FormData ? String(data.get('paciente') || '') : data.paciente || rec.paciente
+    const titulo = data instanceof FormData ? String(data.get('titulo') || '') : rec.titulo
+    await registrarAuditoria(pacienteId, 'criacao', `Arquivo: ${titulo || rec.titulo}`)
+    return rec
+  },
+  async excluirArquivo(id: string, paciente?: string) {
+    if (paciente) await registrarAuditoria(paciente, 'edicao', `Arquivo excluído (${id})`)
+    return await pb.collection('prontuario_arquivos').delete(id)
+  },
 
- // ---- Modelos de documentos (prescrição / pedido de exames) ----
- async listarModelosDocumentos(tipo?: 'prescricao' | 'pedido_exame') {
-   const filter = tipo ? `tipo = "${tipo}" && ativo = true` : 'ativo = true'
-   return await pb.collection('prontuario_modelos_documentos').getFullList<ModeloDocumento>({
-     filter,
-     sort: 'nome',
-   })
- },
+  // ---- Modelos de documentos (prescrição / pedido de exames) ----
+  async listarModelosDocumentos(tipo?: 'prescricao' | 'pedido_exame') {
+    const filter = tipo ? `tipo = "${tipo}" && ativo = true` : 'ativo = true'
+    return await pb.collection('prontuario_modelos_documentos').getFullList<ModeloDocumento>({
+      filter,
+      sort: 'nome',
+    })
+  },
 
- // ---- Documentos gerados ----
- async listarDocumentos(paciente: string) {
-   return await pb
-     .collection('prontuario_documentos')
-     .getFullList<DocumentoClinico>({
-       filter: `paciente = "${paciente}"`,
-       sort: '-created',
-       expand: 'modelo,reemitido_de',
-     })
- },
- async criarDocumento(data: Partial<DocumentoClinico>) {
-   const rec = await pb.collection('prontuario_documentos').create<DocumentoClinico>(data)
-   await registrarAuditoria(
-     data.paciente || rec.paciente,
-     data.reemitido ? 'reemissao' : 'criacao',
-     `${rec.tipo === 'prescricao' ? 'Prescrição' : 'Pedido de exame'}: ${rec.titulo}`,
-   )
-   return rec
- },
- async excluirDocumento(id: string, paciente?: string) {
-   if (paciente) await registrarAuditoria(paciente, 'edicao', `Documento excluído (${id})`)
-   return await pb.collection('prontuario_documentos').delete(id)
- },
+  // ---- Documentos gerados ----
+  async listarDocumentos(paciente: string) {
+    return await pb.collection('prontuario_documentos').getFullList<DocumentoClinico>({
+      filter: `paciente = "${paciente}"`,
+      sort: '-created',
+      expand: 'modelo,reemitido_de',
+    })
+  },
+  async criarDocumento(data: Partial<DocumentoClinico>) {
+    const rec = await pb.collection('prontuario_documentos').create<DocumentoClinico>(data)
+    await registrarAuditoria(
+      data.paciente || rec.paciente,
+      data.reemitido ? 'reemissao' : 'criacao',
+      `${rec.tipo === 'prescricao' ? 'Prescrição' : 'Pedido de exame'}: ${rec.titulo}`,
+    )
+    return rec
+  },
+  async excluirDocumento(id: string, paciente?: string) {
+    if (paciente) await registrarAuditoria(paciente, 'edicao', `Documento excluído (${id})`)
+    return await pb.collection('prontuario_documentos').delete(id)
+  },
 
- // ---- Consentimento LGPD ----
- async listarConsentimentos(paciente: string) {
-   return await pb
-     .collection('prontuario_consentimento')
-     .getFullList<ConsentimentoPaciente>({ filter: `paciente = "${paciente}"`, sort: '-created' })
- },
- async criarConsentimento(data: Partial<ConsentimentoPaciente>) {
-   const rec = await pb.collection('prontuario_consentimento').create<ConsentimentoPaciente>(data)
-   await registrarAuditoria(data.paciente || rec.paciente, 'criacao', `Consentimento: ${rec.tipo}`)
-   return rec
- },
+  // ---- Consentimento LGPD ----
+  async listarConsentimentos(paciente: string) {
+    return await pb
+      .collection('prontuario_consentimento')
+      .getFullList<ConsentimentoPaciente>({ filter: `paciente = "${paciente}"`, sort: '-created' })
+  },
+  async criarConsentimento(data: Partial<ConsentimentoPaciente>) {
+    const rec = await pb.collection('prontuario_consentimento').create<ConsentimentoPaciente>(data)
+    await registrarAuditoria(data.paciente || rec.paciente, 'criacao', `Consentimento: ${rec.tipo}`)
+    return rec
+  },
 
- // ---- Auditoria ----
- async listarAuditoria(paciente: string) {
-   return await pb
-     .collection('prontuario_auditoria')
-     .getFullList<AuditoriaProntuario>({ filter: `paciente = "${paciente}"`, sort: '-created' })
- },
+  // ---- Auditoria ----
+  async listarAuditoria(paciente: string) {
+    return await pb
+      .collection('prontuario_auditoria')
+      .getFullList<AuditoriaProntuario>({ filter: `paciente = "${paciente}"`, sort: '-created' })
+  },
 }
 
 // Usuários / Permissões Service (somente admin — garantido pelas regras da coleção users)

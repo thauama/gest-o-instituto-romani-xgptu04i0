@@ -191,7 +191,13 @@ export interface EvolucaoPaciente {
   updated: string
 }
 
-export type CategoriaArquivoPaciente = 'exame' | 'foto' | 'contrato' | 'orcamento' | 'video' | 'outro'
+export type CategoriaArquivoPaciente =
+  | 'exame'
+  | 'foto'
+  | 'contrato'
+  | 'orcamento'
+  | 'video'
+  | 'outro'
 
 export interface ArquivoPaciente {
   id: string

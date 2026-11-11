@@ -22,7 +22,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { prontuarioService } from '@/services/clinic'
-import type { Cliente, DocumentoClinico, ModeloDocumento, TipoDocumentoClinico } from '@/types/clinic'
+import type {
+  Cliente,
+  DocumentoClinico,
+  ModeloDocumento,
+  TipoDocumentoClinico,
+} from '@/types/clinic'
 import { useToast } from '@/hooks/use-toast'
 
 interface Props {
@@ -51,7 +56,10 @@ export default function AbaDocumentos({ paciente, versao, autor }: Props) {
 
   const carregar = () => {
     setLoading(true)
-    Promise.all([prontuarioService.listarModelosDocumentos(), prontuarioService.listarDocumentos(paciente.id)])
+    Promise.all([
+      prontuarioService.listarModelosDocumentos(),
+      prontuarioService.listarDocumentos(paciente.id),
+    ])
       .then(([ms, ds]) => {
         setModelos(ms)
         setDocumentos(ds)
@@ -65,20 +73,24 @@ export default function AbaDocumentos({ paciente, versao, autor }: Props) {
 
   useEffect(carregar, [paciente.id, versao])
 
+  const [reemitindoDe, setReemitindoDe] = useState<string | null>(null)
+
   const abrirNovo = (tipoInicial: TipoDocumentoClinico = 'prescricao') => {
     setTipo(tipoInicial)
     setModeloId('')
     setTitulo('')
     setConteudo('')
+    setReemitindoDe(null)
     setOpen(true)
   }
 
-  /** Reemissão: abre o formulário preenchido com o documento original. */
+  /** Reemissão: abre o formulário preenchido com o documento original (mantém o histórico). */
   const reemitir = (d: DocumentoClinico) => {
     setTipo(d.tipo)
     setModeloId(d.modelo || '')
     setTitulo(`${d.titulo} (reemissão)`)
     setConteudo(d.conteudo)
+    setReemitindoDe(d.id)
     setOpen(true)
   }
 
@@ -102,9 +114,12 @@ export default function AbaDocumentos({ paciente, versao, autor }: Props) {
         conteudo,
         modelo: modeloId || undefined,
         emitido_por: autor,
+        reemitido: !!reemitindoDe,
+        reemitido_de: reemitindoDe || undefined,
       })
-      toast({ title: 'Documento gerado' })
+      toast({ title: reemitindoDe ? 'Documento reemitido' : 'Documento gerado' })
       setOpen(false)
+      setReemitindoDe(null)
       carregar()
     } catch (err) {
       console.error('Erro ao gerar documento:', err)
@@ -117,7 +132,8 @@ export default function AbaDocumentos({ paciente, versao, autor }: Props) {
   const imprimir = (d: DocumentoClinico) => {
     const janela = window.open('', '_blank', 'width=800,height=900')
     if (!janela) return
-    janela.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${d.titulo}</title>
+    janela.document
+      .write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${d.titulo}</title>
       <style>body{font-family:Georgia,serif;padding:48px;color:#111;line-height:1.6}h1{font-size:18px;margin-bottom:4px}
       .sub{color:#666;font-size:12px;margin-bottom:24px}pre{white-space:pre-wrap;font-family:inherit}</style></head>
       <body><h1>${LABEL_TIPO[d.tipo]} — Instituto Romani</h1>
@@ -125,6 +141,8 @@ export default function AbaDocumentos({ paciente, versao, autor }: Props) {
       <pre>${d.conteudo}</pre></body></html>`)
     janela.document.close()
     janela.print()
+    // LGPD: impressão/download de documento clínico é registrado na auditoria
+    prontuarioService.auditoria(paciente.id, 'impressao', `${LABEL_TIPO[d.tipo]}: ${d.titulo}`)
   }
 
   const excluir = async (d: DocumentoClinico) => {
@@ -147,7 +165,12 @@ export default function AbaDocumentos({ paciente, versao, autor }: Props) {
           mantendo o histórico.
         </p>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => abrirNovo('pedido_exame')} className="text-xs">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => abrirNovo('pedido_exame')}
+            className="text-xs"
+          >
             <Plus className="h-3.5 w-3.5 mr-1" /> Pedido de exame
           </Button>
           <Button size="sm" onClick={() => abrirNovo('prescricao')} className="text-xs">
@@ -174,11 +197,17 @@ export default function AbaDocumentos({ paciente, versao, autor }: Props) {
                 <div className="flex items-start justify-between gap-2">
                   <CardTitle className="text-sm">{d.titulo}</CardTitle>
                   <div className="flex gap-1">
-                    <Badge variant="outline" className="text-[10px] border-slate-300 text-slate-600">
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] border-slate-300 text-slate-600"
+                    >
                       {LABEL_TIPO[d.tipo]}
                     </Badge>
                     {d.reemitido && (
-                      <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-300">
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] bg-amber-50 text-amber-700 border-amber-300"
+                      >
                         <RotateCcw className="h-2.5 w-2.5 mr-0.5" /> Reemitido
                       </Badge>
                     )}
@@ -190,15 +219,32 @@ export default function AbaDocumentos({ paciente, versao, autor }: Props) {
                 </p>
               </CardHeader>
               <CardContent className="space-y-2">
-                <p className="text-xs text-slate-700 whitespace-pre-wrap line-clamp-4">{d.conteudo}</p>
+                <p className="text-xs text-slate-700 whitespace-pre-wrap line-clamp-4">
+                  {d.conteudo}
+                </p>
                 <div className="flex gap-1 pt-1">
-                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => imprimir(d)}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs"
+                    onClick={() => imprimir(d)}
+                  >
                     <Printer className="h-3 w-3 mr-1" /> Imprimir / PDF
                   </Button>
-                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => reemitir(d)}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs"
+                    onClick={() => reemitir(d)}
+                  >
                     <RotateCcw className="h-3 w-3 mr-1" /> Reemitir
                   </Button>
-                  <Button size="sm" variant="ghost" className="h-7 text-rose-600" onClick={() => excluir(d)}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-rose-600"
+                    onClick={() => excluir(d)}
+                  >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
@@ -212,9 +258,11 @@ export default function AbaDocumentos({ paciente, versao, autor }: Props) {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{conteudo && titulo.includes('reemissão') ? 'Reemitir' : 'Gerar'} documento</DialogTitle>
+            <DialogTitle>{reemitindoDe ? 'Reemitir documento' : 'Gerar documento'}</DialogTitle>
             <DialogDescription>
-              Escolha um modelo — o texto vem pronto para ajustar antes de emitir.
+              {reemitindoDe
+                ? 'Uma nova versão será emitida mantendo o original no histórico.'
+                : 'Escolha um modelo — o texto vem pronto para ajustar antes de emitir.'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 text-xs">
@@ -226,14 +274,22 @@ export default function AbaDocumentos({ paciente, versao, autor }: Props) {
                 </SelectTrigger>
                 <SelectContent>
                   {modelosDoTipo.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.nome}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
               <Label>Tipo</Label>
-              <Select value={tipo} onValueChange={(v) => { setTipo(v as TipoDocumentoClinico); setModeloId('') }}>
+              <Select
+                value={tipo}
+                onValueChange={(v) => {
+                  setTipo(v as TipoDocumentoClinico)
+                  setModeloId('')
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -253,7 +309,9 @@ export default function AbaDocumentos({ paciente, versao, autor }: Props) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
             <Button onClick={salvar} disabled={salvando || !titulo || !conteudo}>
               {salvando ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null} Emitir
             </Button>

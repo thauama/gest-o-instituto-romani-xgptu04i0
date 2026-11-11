@@ -1,5 +1,13 @@
 import { useRef, useEffect, useState } from 'react'
-import { Image as ImageIcon, Upload, Trash2, Loader2, FileVideo, FileText, ExternalLink } from 'lucide-react'
+import {
+  Image as ImageIcon,
+  Upload,
+  Trash2,
+  Loader2,
+  FileVideo,
+  FileText,
+  ExternalLink,
+} from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -101,10 +109,19 @@ export default function AbaArquivos({ paciente, versao }: Props) {
   }
 
   const iconeCategoria = (cat: CategoriaArquivoPaciente) =>
-    cat === 'video' ? <FileVideo className="h-4 w-4" /> : cat === 'exame' ? <FileText className="h-4 w-4" /> : <ImageIcon className="h-4 w-4" />
+    cat === 'video' ? (
+      <FileVideo className="h-4 w-4" />
+    ) : cat === 'exame' ? (
+      <FileText className="h-4 w-4" />
+    ) : (
+      <ImageIcon className="h-4 w-4" />
+    )
 
   const urlArquivo = (a: ArquivoPaciente) =>
-    prontuarioService.urlArquivo(a as unknown as { id: string; collectionId?: string; collectionName?: string }, a.arquivo)
+    prontuarioService.urlArquivo(
+      a as unknown as { id: string; collectionId?: string; collectionName?: string },
+      a.arquivo,
+    )
 
   return (
     <div className="space-y-4">
@@ -142,7 +159,9 @@ export default function AbaArquivos({ paciente, versao }: Props) {
                     {CATEGORIAS.find((c) => c.valor === a.categoria)?.label || a.categoria}
                   </Badge>
                 </div>
-                {a.descricao && <p className="text-[11px] text-slate-500 line-clamp-2">{a.descricao}</p>}
+                {a.descricao && (
+                  <p className="text-[11px] text-slate-500 line-clamp-2">{a.descricao}</p>
+                )}
                 <p className="text-[10px] text-slate-400">
                   {new Date(a.created).toLocaleDateString('pt-BR')}
                 </p>
@@ -178,22 +197,38 @@ export default function AbaArquivos({ paciente, versao }: Props) {
           <div className="space-y-3 text-xs">
             <div className="space-y-1">
               <Label htmlFor="arq-titulo">Título</Label>
-              <Input id="arq-titulo" value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex: Hemograma completo" />
+              <Input
+                id="arq-titulo"
+                value={titulo}
+                onChange={(e) => setTitulo(e.target.value)}
+                placeholder="Ex: Hemograma completo"
+              />
             </div>
             <div className="space-y-1">
               <Label>Categoria</Label>
-              <Select value={categoria} onValueChange={(v) => setCategoria(v as CategoriaArquivoPaciente)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select
+                value={categoria}
+                onValueChange={(v) => setCategoria(v as CategoriaArquivoPaciente)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   {CATEGORIAS.map((c) => (
-                    <SelectItem key={c.valor} value={c.valor}>{c.label}</SelectItem>
+                    <SelectItem key={c.valor} value={c.valor}>
+                      {c.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
               <Label htmlFor="arq-desc">Descrição</Label>
-              <Input id="arq-desc" value={descricao} onChange={(e) => setDescricao(e.target.value)} />
+              <Input
+                id="arq-desc"
+                value={descricao}
+                onChange={(e) => setDescricao(e.target.value)}
+              />
             </div>
             <div className="space-y-1">
               <Label>Arquivo</Label>
@@ -206,7 +241,9 @@ export default function AbaArquivos({ paciente, versao }: Props) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
             <Button onClick={salvar} disabled={!file || salvando}>
               {salvando ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null} Enviar
             </Button>

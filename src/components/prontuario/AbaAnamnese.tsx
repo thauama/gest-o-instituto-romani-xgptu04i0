@@ -22,7 +22,13 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { prontuarioService } from '@/services/clinic'
-import type { Anamnese, CampoModeloAnamnese, Cliente, ModeloAnamnese, ModuloAnamnese } from '@/types/clinic'
+import type {
+  Anamnese,
+  CampoModeloAnamnese,
+  Cliente,
+  ModeloAnamnese,
+  ModuloAnamnese,
+} from '@/types/clinic'
 import { useToast } from '@/hooks/use-toast'
 
 interface Props {
@@ -90,6 +96,7 @@ export default function AbaAnamnese({ paciente, versao, autor }: Props) {
         titulo: tituloNova,
         modelo: modeloAtual?.id,
         modulos,
+        preenchido_por: autor,
       })
       toast({ title: 'Anamnese salva' })
       setNovaOpen(false)
@@ -126,7 +133,12 @@ export default function AbaAnamnese({ paciente, versao, autor }: Props) {
 
   const salvarModelo = async () => {
     try {
-      const data = { nome: nomeModelo, descricao: descricaoModelo, campos: camposModelo, ativo: true }
+      const data = {
+        nome: nomeModelo,
+        descricao: descricaoModelo,
+        campos: camposModelo,
+        ativo: true,
+      }
       if (modeloEditando) await prontuarioService.atualizarModeloAnamnese(modeloEditando.id, data)
       else await prontuarioService.criarModeloAnamnese(data)
       toast({ title: 'Modelo salvo' })
@@ -185,7 +197,12 @@ export default function AbaAnamnese({ paciente, versao, autor }: Props) {
                 </p>
               </div>
               <div className="flex gap-1">
-                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => abrirEditor(m)}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs"
+                  onClick={() => abrirEditor(m)}
+                >
                   Editar
                 </Button>
                 <Button
@@ -224,7 +241,12 @@ export default function AbaAnamnese({ paciente, versao, autor }: Props) {
                   {a.preenchido_por ? ` · por ${a.preenchido_por}` : ''}
                 </p>
               </div>
-              <Button size="sm" variant="ghost" className="text-rose-600" onClick={() => excluir(a)}>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-rose-600"
+                onClick={() => excluir(a)}
+              >
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
             </CardHeader>
@@ -254,17 +276,29 @@ export default function AbaAnamnese({ paciente, versao, autor }: Props) {
           <div className="space-y-3 text-xs">
             <div className="space-y-1">
               <Label htmlFor="anamnese-titulo">Título</Label>
-              <Input id="anamnese-titulo" value={tituloNova} onChange={(e) => setTituloNova(e.target.value)} />
+              <Input
+                id="anamnese-titulo"
+                value={tituloNova}
+                onChange={(e) => setTituloNova(e.target.value)}
+              />
             </div>
             <div className="space-y-1">
               <Label>Modelo</Label>
-              <Select value={modeloEscolhido} onValueChange={(v) => { setModeloEscolhido(v); setRespostas({}) }}>
+              <Select
+                value={modeloEscolhido}
+                onValueChange={(v) => {
+                  setModeloEscolhido(v)
+                  setRespostas({})
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione um modelo" />
                 </SelectTrigger>
                 <SelectContent>
                   {modelos.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.nome}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -304,7 +338,9 @@ export default function AbaAnamnese({ paciente, versao, autor }: Props) {
             ))}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setNovaOpen(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setNovaOpen(false)}>
+              Cancelar
+            </Button>
             <Button onClick={salvarNova} disabled={salvando}>
               {salvando ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null} Salvar
             </Button>
@@ -316,7 +352,9 @@ export default function AbaAnamnese({ paciente, versao, autor }: Props) {
       <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
         <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{modeloEditando ? 'Editar modelo' : 'Novo modelo'} de anamnese</DialogTitle>
+            <DialogTitle>
+              {modeloEditando ? 'Editar modelo' : 'Novo modelo'} de anamnese
+            </DialogTitle>
             <DialogDescription>
               Defina os módulos que aparecerão ao preencher uma anamnese com este modelo.
             </DialogDescription>
@@ -397,7 +435,9 @@ export default function AbaAnamnese({ paciente, versao, autor }: Props) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditorOpen(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setEditorOpen(false)}>
+              Cancelar
+            </Button>
             <Button onClick={salvarModelo}>Salvar modelo</Button>
           </DialogFooter>
         </DialogContent>

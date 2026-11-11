@@ -51,17 +51,17 @@ const App = () => (
             <Route path="/movimentacoes" element={<Movimentacoes />} />
             <Route path="/estoque" element={<Estoque />} />
             <Route path="/contratos" element={<ContratosOrcamentos />} />
-           <Route
-             path="/prontuario"
-             element={
-               <ProtectedRoute requireAdmin={true}>
-                 <Prontuario />
-               </ProtectedRoute>
-             }
-           />
-           <Route
-             path="/financeiro"
-             element={
+            <Route
+              path="/prontuario"
+              element={
+                <ProtectedRoute requireAdmin={true}>
+                  <Prontuario />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/financeiro"
+              element={
                 <ProtectedRoute requireAdmin={true}>
                   <Financeiro />
                 </ProtectedRoute>

@@ -34,196 +34,200 @@ migrate(
     }
 
     // ---- Modelos de anamnese (editáveis pelo admin) ----
-    const modelosAnamnese = criarSeNaoExiste('prontuario_modelos_anamnese', () =>
-      new Collection({
-        name: 'prontuario_modelos_anamnese',
-        type: 'base',
-        ...regrasAdmin,
-        fields: [
-          { name: 'nome', type: 'text', required: true, max: 120 },
-          { name: 'descricao', type: 'text' },
-          // [{ titulo, tipo: 'texto'|'texto_longo'|'sim_nao', obrigatorio }]
-          { name: 'campos', type: 'json', maxSize: 2000000 },
-          { name: 'ativo', type: 'bool' },
-          { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
-          { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },
-        ],
-      }),
+    const modelosAnamnese = criarSeNaoExiste(
+      'prontuario_modelos_anamnese',
+      () =>
+        new Collection({
+          name: 'prontuario_modelos_anamnese',
+          type: 'base',
+          ...regrasAdmin,
+          fields: [
+            { name: 'nome', type: 'text', required: true, max: 120 },
+            { name: 'descricao', type: 'text' },
+            // [{ titulo, tipo: 'texto'|'texto_longo'|'sim_nao', obrigatorio }]
+            { name: 'campos', type: 'json', maxSize: 2000000 },
+            { name: 'ativo', type: 'bool' },
+            { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
+            { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },
+          ],
+        }),
     )
 
     // ---- Anamnese (módulos por paciente) ----
-    const anamnese = criarSeNaoExiste('prontuario_anamnese', () =>
-      new Collection({
-        name: 'prontuario_anamnese',
-        type: 'base',
-        ...regrasAdmin,
-        fields: [
-          {
-            name: 'paciente',
-            type: 'relation',
-            collectionId: clientesColId,
-            maxSelect: 1,
-            required: true,
-          },
-          { name: 'titulo', type: 'text', required: true, max: 160 },
-          // [{ titulo, conteudo }] — módulos editáveis pelo Dr. Pedro Ivo
-          { name: 'modulos', type: 'json', maxSize: 2000000 },
-          { name: 'modelo', type: 'relation', collectionId: modelosAnamnese.id, maxSelect: 1 },
-          { name: 'preenchido_por', type: 'text' },
-          { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
-          { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },
-        ],
-        indexes: [
-          'CREATE INDEX idx_anamnese_paciente ON prontuario_anamnese (paciente)',
-        ],
-      }),
+    const anamnese = criarSeNaoExiste(
+      'prontuario_anamnese',
+      () =>
+        new Collection({
+          name: 'prontuario_anamnese',
+          type: 'base',
+          ...regrasAdmin,
+          fields: [
+            {
+              name: 'paciente',
+              type: 'relation',
+              collectionId: clientesColId,
+              maxSelect: 1,
+              required: true,
+            },
+            { name: 'titulo', type: 'text', required: true, max: 160 },
+            // [{ titulo, conteudo }] — módulos editáveis pelo Dr. Pedro Ivo
+            { name: 'modulos', type: 'json', maxSize: 2000000 },
+            { name: 'modelo', type: 'relation', collectionId: modelosAnamnese.id, maxSelect: 1 },
+            { name: 'preenchido_por', type: 'text' },
+            { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
+            { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },
+          ],
+          indexes: ['CREATE INDEX idx_anamnese_paciente ON prontuario_anamnese (paciente)'],
+        }),
     )
 
     // ---- Observações sobre o paciente ----
-    criarSeNaoExiste('prontuario_observacoes', () =>
-      new Collection({
-        name: 'prontuario_observacoes',
-        type: 'base',
-        ...regrasAdmin,
-        fields: [
-          {
-            name: 'paciente',
-            type: 'relation',
-            collectionId: clientesColId,
-            maxSelect: 1,
-            required: true,
-          },
-          { name: 'texto', type: 'text', required: true },
-          { name: 'autor', type: 'text' },
-          { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
-          { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },
-        ],
-        indexes: [
-          'CREATE INDEX idx_observacoes_paciente ON prontuario_observacoes (paciente)',
-        ],
-      }),
+    criarSeNaoExiste(
+      'prontuario_observacoes',
+      () =>
+        new Collection({
+          name: 'prontuario_observacoes',
+          type: 'base',
+          ...regrasAdmin,
+          fields: [
+            {
+              name: 'paciente',
+              type: 'relation',
+              collectionId: clientesColId,
+              maxSelect: 1,
+              required: true,
+            },
+            { name: 'texto', type: 'text', required: true },
+            { name: 'autor', type: 'text' },
+            { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
+            { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },
+          ],
+          indexes: ['CREATE INDEX idx_observacoes_paciente ON prontuario_observacoes (paciente)'],
+        }),
     )
 
     // ---- Evolução + transcrição (Plaud: colar texto + anexo opcional) ----
-    criarSeNaoExiste('prontuario_evolucao', () =>
-      new Collection({
-        name: 'prontuario_evolucao',
-        type: 'base',
-        ...regrasAdmin,
-        fields: [
-          {
-            name: 'paciente',
-            type: 'relation',
-            collectionId: clientesColId,
-            maxSelect: 1,
-            required: true,
-          },
-          { name: 'data', type: 'text', required: true }, // YYYY-MM-DD
-          { name: 'titulo', type: 'text', max: 160 },
-          { name: 'descricao', type: 'text' }, // evolução clínica
-          { name: 'transcricao', type: 'text' }, // texto colado do Plaud
-          { name: 'anexo', type: 'file', maxSelect: 1, maxSize: 26214400 },
-          { name: 'autor', type: 'text' },
-          { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
-          { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },
-        ],
-        indexes: [
-          'CREATE INDEX idx_evolucao_paciente ON prontuario_evolucao (paciente)',
-        ],
-      }),
+    criarSeNaoExiste(
+      'prontuario_evolucao',
+      () =>
+        new Collection({
+          name: 'prontuario_evolucao',
+          type: 'base',
+          ...regrasAdmin,
+          fields: [
+            {
+              name: 'paciente',
+              type: 'relation',
+              collectionId: clientesColId,
+              maxSelect: 1,
+              required: true,
+            },
+            { name: 'data', type: 'text', required: true }, // YYYY-MM-DD
+            { name: 'titulo', type: 'text', max: 160 },
+            { name: 'descricao', type: 'text' }, // evolução clínica
+            { name: 'transcricao', type: 'text' }, // texto colado do Plaud
+            { name: 'anexo', type: 'file', maxSelect: 1, maxSize: 26214400 },
+            { name: 'autor', type: 'text' },
+            { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
+            { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },
+          ],
+          indexes: ['CREATE INDEX idx_evolucao_paciente ON prontuario_evolucao (paciente)'],
+        }),
     )
 
     // ---- Arquivos (fotos, exames, contratos, orçamentos, vídeos) ----
-    criarSeNaoExiste('prontuario_arquivos', () =>
-      new Collection({
-        name: 'prontuario_arquivos',
-        type: 'base',
-        ...regrasAdmin,
-        fields: [
-          {
-            name: 'paciente',
-            type: 'relation',
-            collectionId: clientesColId,
-            maxSelect: 1,
-            required: true,
-          },
-          { name: 'titulo', type: 'text', required: true, max: 160 },
-          {
-            name: 'categoria',
-            type: 'select',
-            values: ['exame', 'foto', 'contrato', 'orcamento', 'video', 'outro'],
-            maxSelect: 1,
-            required: true,
-          },
-          { name: 'arquivo', type: 'file', required: true, maxSelect: 1, maxSize: 52428800 },
-          { name: 'descricao', type: 'text' },
-          { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
-          { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },
-        ],
-        indexes: [
-          'CREATE INDEX idx_arquivos_paciente ON prontuario_arquivos (paciente)',
-        ],
-      }),
+    criarSeNaoExiste(
+      'prontuario_arquivos',
+      () =>
+        new Collection({
+          name: 'prontuario_arquivos',
+          type: 'base',
+          ...regrasAdmin,
+          fields: [
+            {
+              name: 'paciente',
+              type: 'relation',
+              collectionId: clientesColId,
+              maxSelect: 1,
+              required: true,
+            },
+            { name: 'titulo', type: 'text', required: true, max: 160 },
+            {
+              name: 'categoria',
+              type: 'select',
+              values: ['exame', 'foto', 'contrato', 'orcamento', 'video', 'outro'],
+              maxSelect: 1,
+              required: true,
+            },
+            { name: 'arquivo', type: 'file', required: true, maxSelect: 1, maxSize: 52428800 },
+            { name: 'descricao', type: 'text' },
+            { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
+            { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },
+          ],
+          indexes: ['CREATE INDEX idx_arquivos_paciente ON prontuario_arquivos (paciente)'],
+        }),
     )
 
     // ---- Modelos de documentos (prescrições e pedidos de exames) ----
-    const modelosDocs = criarSeNaoExiste('prontuario_modelos_documentos', () =>
-      new Collection({
-        name: 'prontuario_modelos_documentos',
-        type: 'base',
-        ...regrasAdmin,
-        fields: [
-          { name: 'nome', type: 'text', required: true, max: 120 },
-          {
-            name: 'tipo',
-            type: 'select',
-            values: ['prescricao', 'pedido_exame'],
-            maxSelect: 1,
-            required: true,
-          },
-          // Placeholders: {paciente}, {data}, {profissional}
-          { name: 'conteudo', type: 'text', required: true },
-          { name: 'ativo', type: 'bool' },
-          { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
-          { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },
-        ],
-      }),
+    const modelosDocs = criarSeNaoExiste(
+      'prontuario_modelos_documentos',
+      () =>
+        new Collection({
+          name: 'prontuario_modelos_documentos',
+          type: 'base',
+          ...regrasAdmin,
+          fields: [
+            { name: 'nome', type: 'text', required: true, max: 120 },
+            {
+              name: 'tipo',
+              type: 'select',
+              values: ['prescricao', 'pedido_exame'],
+              maxSelect: 1,
+              required: true,
+            },
+            // Placeholders: {paciente}, {data}, {profissional}
+            { name: 'conteudo', type: 'text', required: true },
+            { name: 'ativo', type: 'bool' },
+            { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
+            { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },
+          ],
+        }),
     )
 
     // ---- Documentos gerados (prescrições / pedidos de exames) ----
-    const documentos = criarSeNaoExiste('prontuario_documentos', () =>
-      new Collection({
-        name: 'prontuario_documentos',
-        type: 'base',
-        ...regrasAdmin,
-        fields: [
-          {
-            name: 'paciente',
-            type: 'relation',
-            collectionId: clientesColId,
-            maxSelect: 1,
-            required: true,
-          },
-          {
-            name: 'tipo',
-            type: 'select',
-            values: ['prescricao', 'pedido_exame'],
-            maxSelect: 1,
-            required: true,
-          },
-          { name: 'titulo', type: 'text', required: true, max: 160 },
-          { name: 'conteudo', type: 'text', required: true },
-          { name: 'data', type: 'text' }, // YYYY-MM-DD
-          { name: 'modelo', type: 'relation', collectionId: modelosDocs.id, maxSelect: 1 },
-          { name: 'reemitido', type: 'bool' },
-          { name: 'emitido_por', type: 'text' },
-          { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
-          { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },
-        ],
-        indexes: [
-          'CREATE INDEX idx_documentos_paciente ON prontuario_documentos (paciente)',
-        ],
-      }),
+    const documentos = criarSeNaoExiste(
+      'prontuario_documentos',
+      () =>
+        new Collection({
+          name: 'prontuario_documentos',
+          type: 'base',
+          ...regrasAdmin,
+          fields: [
+            {
+              name: 'paciente',
+              type: 'relation',
+              collectionId: clientesColId,
+              maxSelect: 1,
+              required: true,
+            },
+            {
+              name: 'tipo',
+              type: 'select',
+              values: ['prescricao', 'pedido_exame'],
+              maxSelect: 1,
+              required: true,
+            },
+            { name: 'titulo', type: 'text', required: true, max: 160 },
+            { name: 'conteudo', type: 'text', required: true },
+            { name: 'data', type: 'text' }, // YYYY-MM-DD
+            { name: 'modelo', type: 'relation', collectionId: modelosDocs.id, maxSelect: 1 },
+            { name: 'reemitido', type: 'bool' },
+            { name: 'emitido_por', type: 'text' },
+            { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
+            { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },
+          ],
+          indexes: ['CREATE INDEX idx_documentos_paciente ON prontuario_documentos (paciente)'],
+        }),
     )
     // Auto-relação de reemissão (aponta para a própria coleção, criada agora)
     if (!documentos.fields.getByName('reemitido_de')) {
@@ -239,76 +243,80 @@ migrate(
     }
 
     // ---- Auditoria de acessos (create-only, LGPD) ----
-    criarSeNaoExiste('prontuario_auditoria', () =>
-      new Collection({
-        name: 'prontuario_auditoria',
-        type: 'base',
-        listRule: "@request.auth.role = 'admin'",
-        viewRule: "@request.auth.role = 'admin'",
-        createRule: "@request.auth.id != ''",
-        updateRule: null,
-        deleteRule: null,
-        fields: [
-          {
-            name: 'paciente',
-            type: 'relation',
-            collectionId: clientesColId,
-            maxSelect: 1,
-            required: true,
-          },
-          {
-            name: 'acao',
-            type: 'select',
-            values: ['visualizacao', 'criacao', 'edicao', 'impressao', 'download', 'reemissao'],
-            maxSelect: 1,
-            required: true,
-          },
-          { name: 'detalhe', type: 'text' },
-          { name: 'usuario', type: 'text' }, // nome/e-mail de quem acessou
-          { name: 'usuario_id', type: 'text' },
-          { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
-        ],
-        indexes: [
-          'CREATE INDEX idx_auditoria_paciente ON prontuario_auditoria (paciente)',
-          'CREATE INDEX idx_auditoria_acao ON prontuario_auditoria (acao)',
-        ],
-      }),
+    criarSeNaoExiste(
+      'prontuario_auditoria',
+      () =>
+        new Collection({
+          name: 'prontuario_auditoria',
+          type: 'base',
+          listRule: "@request.auth.role = 'admin'",
+          viewRule: "@request.auth.role = 'admin'",
+          createRule: "@request.auth.id != ''",
+          updateRule: null,
+          deleteRule: null,
+          fields: [
+            {
+              name: 'paciente',
+              type: 'relation',
+              collectionId: clientesColId,
+              maxSelect: 1,
+              required: true,
+            },
+            {
+              name: 'acao',
+              type: 'select',
+              values: ['visualizacao', 'criacao', 'edicao', 'impressao', 'download', 'reemissao'],
+              maxSelect: 1,
+              required: true,
+            },
+            { name: 'detalhe', type: 'text' },
+            { name: 'usuario', type: 'text' }, // nome/e-mail de quem acessou
+            { name: 'usuario_id', type: 'text' },
+            { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
+          ],
+          indexes: [
+            'CREATE INDEX idx_auditoria_paciente ON prontuario_auditoria (paciente)',
+            'CREATE INDEX idx_auditoria_acao ON prontuario_auditoria (acao)',
+          ],
+        }),
     )
 
     // ---- Consentimento LGPD ----
-    criarSeNaoExiste('prontuario_consentimento', () =>
-      new Collection({
-        name: 'prontuario_consentimento',
-        type: 'base',
-        ...regrasAdmin,
-        fields: [
-          {
-            name: 'paciente',
-            type: 'relation',
-            collectionId: clientesColId,
-            maxSelect: 1,
-            required: true,
-          },
-          {
-            name: 'tipo',
-            type: 'select',
-            values: ['uso_dados', 'tratamento', 'imagem', 'outro'],
-            maxSelect: 1,
-            required: true,
-          },
-          { name: 'versao', type: 'text' }, // ex.: '1.0 — 2026-11'
-          { name: 'conteudo', type: 'text' }, // texto do termo no momento da assinatura
-          { name: 'assinado', type: 'bool' },
-          { name: 'assinado_em', type: 'text' }, // YYYY-MM-DD
-          { name: 'arquivo', type: 'file', maxSelect: 1, maxSize: 26214400 }, // termo assinado
-          { name: 'registrado_por', type: 'text' },
-          { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
-          { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },
-        ],
-        indexes: [
-          'CREATE INDEX idx_consentimento_paciente ON prontuario_consentimento (paciente)',
-        ],
-      }),
+    criarSeNaoExiste(
+      'prontuario_consentimento',
+      () =>
+        new Collection({
+          name: 'prontuario_consentimento',
+          type: 'base',
+          ...regrasAdmin,
+          fields: [
+            {
+              name: 'paciente',
+              type: 'relation',
+              collectionId: clientesColId,
+              maxSelect: 1,
+              required: true,
+            },
+            {
+              name: 'tipo',
+              type: 'select',
+              values: ['uso_dados', 'tratamento', 'imagem', 'outro'],
+              maxSelect: 1,
+              required: true,
+            },
+            { name: 'versao', type: 'text' }, // ex.: '1.0 — 2026-11'
+            { name: 'conteudo', type: 'text' }, // texto do termo no momento da assinatura
+            { name: 'assinado', type: 'bool' },
+            { name: 'assinado_em', type: 'text' }, // YYYY-MM-DD
+            { name: 'arquivo', type: 'file', maxSelect: 1, maxSize: 26214400 }, // termo assinado
+            { name: 'registrado_por', type: 'text' },
+            { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
+            { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },
+          ],
+          indexes: [
+            'CREATE INDEX idx_consentimento_paciente ON prontuario_consentimento (paciente)',
+          ],
+        }),
     )
 
     // ---- Seeds idempotentes ----
@@ -337,7 +345,11 @@ migrate(
           { titulo: 'Tabagismo / Etilismo', tipo: 'texto', obrigatorio: false },
           { titulo: 'História familiar', tipo: 'texto_longo', obrigatorio: false },
           { titulo: 'Exame físico', tipo: 'texto_longo', obrigatorio: false },
-          { titulo: 'Autoriza o uso de imagens para fins clínicos?', tipo: 'sim_nao', obrigatorio: true },
+          {
+            titulo: 'Autoriza o uso de imagens para fins clínicos?',
+            tipo: 'sim_nao',
+            obrigatorio: true,
+          },
         ],
       },
       {
