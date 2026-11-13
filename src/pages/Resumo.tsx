@@ -13,8 +13,10 @@ import {
 import type { ItemEstoque, Movimentacao, Contrato, Consulta } from '@/types/clinic'
 import {
   alertaValidade,
+  contratosEmAlerta,
   itensEmAlertaValidade,
   nivelEstoque,
+  ordenarPorValidade,
   ALERTA_VALIDADE_LABEL,
 } from '@/lib/estoque'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -75,25 +77,16 @@ export default function Resumo() {
       setItensFalta(lowStock)
       // Mesmo critério de validade da tela Estoque (src/lib/estoque.ts):
       // vencido = data passada, vencendo = vence em até 60 dias
-      setItensValidade(itensEmAlertaValidade(items))
+      setItensValidade(ordenarPorValidade(itensEmAlertaValidade(items)))
 
       // Fetch Movimentacoes
       const movs = await movimentacoesService.list('', '-created')
       setUltimasMovimentacoes(movs.slice(0, 5))
 
-      // Fetch Contratos & identify > 1 year
+      // Fetch Contratos & identify > 1 year (critério central em src/lib/estoque.ts,
+      // que exclui executados/concluídos e cancelados da contagem de alerta)
       const conts = await contratosService.list()
-      const oneYearAgo = new Date()
-      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
-      const oneYearAgoStr = oneYearAgo.toISOString().slice(0, 10)
-
-      const expiredConts = conts.filter(
-        (c) =>
-          c.situacao !== 'concluido' &&
-          c.situacao !== 'cancelado' &&
-          c.data_emissao <= oneYearAgoStr,
-      )
-      setContratosAlerta(expiredConts)
+      setContratosAlerta(contratosEmAlerta(conts))
 
       // Fetch Consultas
       const conss = await consultasService.list(`data >= "${today}"`, 'data,horario')

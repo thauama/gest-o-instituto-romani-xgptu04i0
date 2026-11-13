@@ -40,11 +40,14 @@ import {
   type NivelEstoque,
   type AlertaValidade,
   ALERTA_VALIDADE_CLASSE,
+  ALERTA_VALIDADE_LABEL,
+  ordenarPorValidade,
 } from '@/lib/estoque'
 import { RelatorioEstoque } from '@/components/estoque/RelatorioEstoque'
 import { cn } from '@/lib/utils'
 
 type FiltroSituacao = 'todos' | NivelEstoque
+type OrdenacaoValidade = 'vencimento' | 'nome'
 
 const formataData = (iso: string) => {
   const d = new Date(iso.length <= 10 ? `${iso}T12:00:00` : iso)
@@ -274,6 +277,10 @@ export default function Estoque() {
   const [busca, setBusca] = useState('')
   const [filtroTipo, setFiltroTipo] = useState<'todos' | ItemEstoque['tipo']>('todos')
   const [filtroSituacao, setFiltroSituacao] = useState<FiltroSituacao>('todos')
+  const [ordenacao, setOrdenacao] = useState<OrdenacaoValidade>('vencimento')
+  // Filtro por situação de validade: vencidos / vencendo / sem alerta
+  const [filtroValidade, setFiltroValidade] = useState<'todos' | AlertaValidade>('todos')
+  const validadeDeItem = (i: EstoqueItem): AlertaValidade => (i.validade ? i.validadeAlerta : 'ok')
   const [itemHistorico, setItemHistorico] = useState<EstoqueItem | null>(null)
   const [itemAjuste, setItemAjuste] = useState<EstoqueItem | null>(null)
   const [relatorioAberto, setRelatorioAberto] = useState(false)
@@ -301,11 +308,16 @@ export default function Estoque() {
   })
 
   const linhas = useMemo(() => {
-    return consolidarEstoque(itens || [], checklist)
-      .filter((i) => filtroTipo === 'todos' || i.tipo === filtroTipo)
-      .filter((i) => filtroSituacao === 'todos' || i.nivel === filtroSituacao)
-      .filter((i) => !busca.trim() || i.nome.toLowerCase().includes(busca.trim().toLowerCase()))
-  }, [itens, checklist, filtroTipo, filtroSituacao, busca])
+    return ordenarPorValidade(
+      consolidarEstoque(itens || [], checklist)
+        .filter((i) => filtroTipo === 'todos' || i.tipo === filtroTipo)
+        .filter((i) => filtroSituacao === 'todos' || i.nivel === filtroSituacao)
+        .filter((i) => filtroValidade === 'todos' || validadeDeItem(i) === filtroValidade)
+        .filter((i) => !busca.trim() || i.nome.toLowerCase().includes(busca.trim().toLowerCase())),
+      ordenacao === 'vencimento',
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itens, checklist, filtroTipo, filtroSituacao, filtroValidade, ordenacao, busca])
 
   const resumo = useMemo(
     () => totaisEstoque(itens ? consolidarEstoque(itens, checklist) : []),
@@ -448,6 +460,28 @@ export default function Estoque() {
                   )}
                 >
                   {s === 'todos' ? 'Todas' : NIVEL_ESTOQUE_LABEL[s]}
+                </Button>
+              ))}
+            </div>
+            <div className="flex gap-1.5">
+              {(['todos', 'vencido', 'vencendo'] as const).map((v) => (
+                <Button
+                  key={v}
+                  size="sm"
+                  variant={filtroValidade === v ? 'default' : 'outline'}
+                  onClick={() => setFiltroValidade(v)}
+                  className={cn(
+                    'h-8',
+                    filtroValidade === v
+                      ? 'bg-sky-600 hover:bg-sky-500 text-white'
+                      : 'border-slate-600 bg-transparent text-slate-200 hover:bg-slate-800',
+                  )}
+                >
+                  {v === 'todos'
+                    ? 'Validade: todas'
+                    : v === 'vencido'
+                      ? ALERTA_VALIDADE_LABEL.vencido
+                      : ALERTA_VALIDADE_LABEL.vencendo}
                 </Button>
               ))}
             </div>

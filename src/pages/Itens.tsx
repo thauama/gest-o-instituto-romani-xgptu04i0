@@ -2,7 +2,12 @@ import React, { useEffect, useState } from 'react'
 import { itensService } from '@/services/clinic'
 import type { ItemEstoque } from '@/types/clinic'
 import { PROCEDIMENTOS_CLINICA } from '@/lib/procedimentos'
-import { alertaValidade, ALERTA_VALIDADE_CLASSE, ALERTA_VALIDADE_LABEL } from '@/lib/estoque'
+import {
+  alertaValidade,
+  ordenarPorValidade,
+  ALERTA_VALIDADE_CLASSE,
+  ALERTA_VALIDADE_LABEL,
+} from '@/lib/estoque'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -41,6 +46,7 @@ export default function Itens() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [tipoFiltro, setTipoFiltro] = useState<string>('todos')
+  const [ordenacao, setOrdenacao] = useState<'vencimento' | 'nome'>('vencimento')
 
   // Modal State
   const [openModal, setOpenModal] = useState(false)
@@ -139,13 +145,16 @@ export default function Itens() {
     }
   }
 
-  const filtered = itens.filter((it) => {
-    const matchSearch =
-      it.nome?.toLowerCase().includes(search.toLowerCase()) ||
-      it.descricao?.toLowerCase().includes(search.toLowerCase())
-    const matchTipo = tipoFiltro === 'todos' || it.tipo === tipoFiltro
-    return matchSearch && matchTipo
-  })
+  const filtered = ordenarPorValidade(
+    itens.filter((it) => {
+      const matchSearch =
+        it.nome?.toLowerCase().includes(search.toLowerCase()) ||
+        it.descricao?.toLowerCase().includes(search.toLowerCase())
+      const matchTipo = tipoFiltro === 'todos' || it.tipo === tipoFiltro
+      return matchSearch && matchTipo
+    }),
+    ordenacao === 'vencimento',
+  )
 
   const badgeValidade = (it: ItemEstoque) => {
     const alerta = alertaValidade(it)
@@ -155,7 +164,7 @@ export default function Itens() {
         variant="outline"
         className={`text-[10px] font-semibold border ${ALERTA_VALIDADE_CLASSE[alerta]}`}
       >
-        {alerta === 'vencido' ? 'Vencido' : 'Vence em 60 dias'}
+        {ALERTA_VALIDADE_LABEL[alerta]}
       </Badge>
     )
   }
@@ -207,6 +216,16 @@ export default function Itens() {
               <SelectItem value="produto">Produtos (Farmácia)</SelectItem>
               <SelectItem value="peca">Peças / Implantes</SelectItem>
               <SelectItem value="servico">Serviços / Sessões</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={ordenacao} onValueChange={(v) => setOrdenacao(v as 'vencimento' | 'nome')}>
+            <SelectTrigger className="w-full sm:w-56 h-9 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="vencimento">Ordem: Vencimento (próximos primeiro)</SelectItem>
+              <SelectItem value="nome">Ordem: Nome (A–Z)</SelectItem>
             </SelectContent>
           </Select>
         </div>

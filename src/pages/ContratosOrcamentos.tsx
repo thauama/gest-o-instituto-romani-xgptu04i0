@@ -29,7 +29,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { PROCEDIMENTOS_CLINICA, PROCEDIMENTO_OUTRO } from '@/lib/procedimentos'
-import { materiaisDoProcedimento, quantidadeParaProcedimento } from '@/lib/estoque'
+import {
+  contratoEmAlerta,
+  materiaisDoProcedimento,
+  quantidadeParaProcedimento,
+} from '@/lib/estoque'
 import { toast } from '@/hooks/use-toast'
 import {
   FileText,
@@ -43,6 +47,7 @@ import {
   CheckSquare,
   Square,
   Trash2,
+  RotateCcw,
 } from 'lucide-react'
 
 export default function ContratosOrcamentos() {
@@ -105,12 +110,33 @@ export default function ContratosOrcamentos() {
     }
   }
 
-  const isMoreThanOneYear = (dataEmissao: string) => {
-    if (!dataEmissao) return false
-    const emissaoDate = new Date(dataEmissao)
-    const oneYearAgo = new Date()
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
-    return emissaoDate <= oneYearAgo
+  // Critério central (src/lib/estoque.ts): contratos executados (concluídos) e
+  // cancelados não entram no alerta de +1 ano
+  const isMoreThanOneYear = (c: Pick<Contrato, 'data_emissao' | 'situacao'>) => contratoEmAlerta(c)
+
+  const [atualizandoSituacao, setAtualizandoSituacao] = useState<string | null>(null)
+
+  const handleUpdateContratoSituacao = async (id: string, situacao: Contrato['situacao']) => {
+    setAtualizandoSituacao(id)
+    try {
+      await contratosService.update(id, { situacao })
+      await loadAll()
+      toast({
+        title: situacao === 'concluido' ? 'Contrato executado' : 'Contrato reaberto',
+        description:
+          situacao === 'concluido'
+            ? 'O contrato saiu da contagem de alertas de +1 ano.'
+            : 'O contrato voltou a entrar na contagem de alertas.',
+      })
+    } catch (err) {
+      toast({
+        title: 'Erro ao atualizar contrato',
+        description: err instanceof Error ? err.message : 'Tente novamente.',
+        variant: 'destructive',
+      })
+    } finally {
+      setAtualizandoSituacao(null)
+    }
   }
 
   const handleOpenChecklist = async (c: Contrato) => {
@@ -298,7 +324,7 @@ export default function ContratosOrcamentos() {
               </div>
             ) : (
               contratos.map((c) => {
-                const expired = isMoreThanOneYear(c.data_emissao)
+                const expired = isMoreThanOneYear(c)
                 return (
                   <Card
                     key={c.id}
@@ -321,7 +347,11 @@ export default function ContratosOrcamentos() {
                           className={`text-[10px] uppercase font-semibold ${
                             c.situacao === 'assinado'
                               ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                              : 'bg-amber-50 text-amber-800 border-amber-300'
+                              : c.situacao === 'concluido'
+                                ? 'bg-sky-50 text-sky-800 border-sky-300'
+                                : c.situacao === 'cancelado'
+                                  ? 'bg-slate-100 text-slate-600 border-slate-300'
+                                  : 'bg-amber-50 text-amber-800 border-amber-300'
                           }`}
                         >
                           {c.situacao}
@@ -364,6 +394,36 @@ export default function ContratosOrcamentos() {
                           {c.observacoes}
                         </p>
                       )}
+
+                      {/* Marcar como executado (concluído) — sai do alerta de +1 ano */}
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-1.5">
+                        {c.situacao !== 'concluido' && c.situacao !== 'cancelado' && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleUpdateContratoSituacao(c.id, 'concluido')}
+                            disabled={atualizandoSituacao === c.id}
+                            className="h-7 text-[11px] text-sky-700 hover:bg-sky-50 px-2"
+                          >
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            {atualizandoSituacao === c.id ? 'Salvando…' : 'Marcar como executado'}
+                          </Button>
+                        )}
+                        {c.situacao === 'concluido' && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleUpdateContratoSituacao(c.id, 'assinado')}
+                            disabled={atualizandoSituacao === c.id}
+                            className="h-7 text-[11px] text-slate-600 hover:bg-slate-100 px-2"
+                          >
+                            <RotateCcw className="h-3 w-3 mr-1" />
+                            {atualizandoSituacao === c.id
+                              ? 'Reabrindo…'
+                              : 'Reabrir (voltar a alertar)'}
+                          </Button>
+                        )}
+                      </div>
 
                       {/* Checklist Button */}
                       <div className="pt-2 border-t border-slate-100 flex items-center justify-between">

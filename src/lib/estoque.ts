@@ -1,4 +1,4 @@
-import type { ChecklistItem, ItemEstoque, Movimentacao } from '@/types/clinic'
+import type { ChecklistItem, Contrato, ItemEstoque, Movimentacao } from '@/types/clinic'
 
 /**
  * Regras centrais de nível de estoque — usadas pela tela Estoque,
@@ -98,12 +98,13 @@ export function alertaValidade(
   hoje: Date = new Date(),
 ): AlertaValidade {
   if (!item.validade) return 'ok'
-  const limite = new Date(hoje)
-  limite.setHours(0, 0, 0, 0)
+  const hojeDia = new Date(hoje)
+  hojeDia.setHours(0, 0, 0, 0)
+  const limite = new Date(hojeDia)
   limite.setDate(limite.getDate() + DIAS_ALERTA_VALIDADE)
   const data = inicioDoDia(item.validade)
   if (Number.isNaN(data.getTime())) return 'ok'
-  if (data < inicioDoDia(hoje.toISOString())) return 'vencido'
+  if (data < hojeDia) return 'vencido'
   if (data <= limite) return 'vencendo'
   return 'ok'
 }
@@ -123,6 +124,58 @@ export const ALERTA_VALIDADE_CLASSE: Record<AlertaValidade, string> = {
 /** Itens com validade vencida ou vencendo na janela de 60 dias. */
 export function itensEmAlertaValidade(itens: ItemEstoque[]): ItemEstoque[] {
   return itens.filter((i) => alertaValidade(i) !== 'ok')
+}
+
+/** Peso de ordenação por validade: vencido primeiro, depois vencendo, sem validade por último. */
+const pesoAlerta: Record<AlertaValidade, number> = { vencido: 0, vencendo: 1, ok: 2 }
+
+/**
+ * Ordena itens por data de vencimento: mais próximos do vencimento primeiro
+ * (vencidos no topo), itens sem validade por último. Empate = nome.
+ * Único critério — usado pelo catálogo (Itens) e pela tela Estoque.
+ */
+export function ordenarPorValidade<T extends Pick<ItemEstoque, 'nome' | 'validade'>>(
+  itens: T[],
+  porVencimento = true,
+): T[] {
+  if (!porVencimento) {
+    return [...itens].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  }
+  return [...itens].sort((a, b) => {
+    const pa = pesoAlerta[alertaValidade(a)]
+    const pb = pesoAlerta[alertaValidade(b)]
+    if (pa !== pb) return pa - pb
+    // Mesmo grupo: sem validade fica no fim em ordem de nome; com validade, a mais antiga primeiro
+    if (!a.validade && !b.validade) return a.nome.localeCompare(b.nome, 'pt-BR')
+    if (!a.validade) return 1
+    if (!b.validade) return -1
+    const cmp = a.validade.localeCompare(b.validade)
+    return cmp !== 0 ? cmp : a.nome.localeCompare(b.nome, 'pt-BR')
+  })
+}
+
+// ------------------------------------------------------------- Contratos > 1 ano
+
+/**
+ * Critério central do alerta de contrato com mais de 1 ano (Resumo + Contratos):
+ * contratos executados (concluído) e cancelados NÃO entram na contagem/destaque —
+ * o alerta de reavaliação de risco só faz sentido para contratos ainda ativos.
+ */
+export function contratoEmAlerta(contrato: Pick<Contrato, 'data_emissao' | 'situacao'>): boolean {
+  if (contrato.situacao === 'concluido' || contrato.situacao === 'cancelado') return false
+  const emissao = inicioDoDia(contrato.data_emissao)
+  if (Number.isNaN(emissao.getTime())) return false
+  const umAnoAtras = new Date()
+  umAnoAtras.setHours(0, 0, 0, 0)
+  umAnoAtras.setFullYear(umAnoAtras.getFullYear() - 1)
+  return emissao <= umAnoAtras
+}
+
+/** Contratos com mais de 1 ano, excluindo executados (concluídos) e cancelados. */
+export function contratosEmAlerta<T extends Pick<Contrato, 'data_emissao' | 'situacao'>>(
+  contratos: T[],
+): T[] {
+  return contratos.filter(contratoEmAlerta)
 }
 
 export interface EstoqueItem extends ItemEstoque {
