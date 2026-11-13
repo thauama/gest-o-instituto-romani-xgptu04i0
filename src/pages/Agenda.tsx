@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { consultasService, clientesService } from '@/services/clinic'
 import type { Consulta, Cliente } from '@/types/clinic'
-import { ConnectorButton } from '@/components/skip/ConnectorButton'
-import { execute, listConnectors } from '@/lib/skipConnectors'
+import pb from '@/lib/pocketbase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,7 +38,11 @@ export default function Agenda() {
   const [consultas, setConsultas] = useState<Consulta[]>([])
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [loading, setLoading] = useState(true)
-  const [googleStatus, setGoogleStatus] = useState<string>('not_connected')
+  // 'checking' até o servidor responder; depois, se a conta da clínica (owner-mode) está disponível.
+  const [googleStatus, setGoogleStatus] = useState<'checking' | 'connected' | 'not_connected'>(
+    'checking',
+  )
+  const [googleMotivo, setGoogleMotivo] = useState('')
   const [syncingGoogle, setSyncingGoogle] = useState(false)
   const [googleEvents, setGoogleEvents] = useState<any[]>([])
   const [erroGoogle, setErroGoogle] = useState<string | null>(null)
@@ -62,13 +65,16 @@ export default function Agenda() {
     checkConnector()
   }, [])
 
+  // Status do owner-mode no servidor (conta da clínica), não da conta do usuário logado.
   const checkConnector = async () => {
     try {
-      const all = await listConnectors()
-      const gcal = all.find((c) => c.toolkit === 'googlecalendar')
-      setGoogleStatus(gcal?.status || 'not_connected')
+      const res: any = await pb.send('/backend/v1/romani/google-calendar/status', { method: 'GET' })
+      setGoogleStatus(res?.connected ? 'connected' : 'not_connected')
+      setGoogleMotivo(res?.motivo || '')
     } catch (err) {
-      console.warn('Erro ao checar conector do Google Calendar:', err)
+      console.warn('Erro ao checar a conta do Google Calendar da clínica:', err)
+      setGoogleStatus('not_connected')
+      setGoogleMotivo('Não foi possível verificar a conta agora.')
     }
   }
 
@@ -94,28 +100,23 @@ export default function Agenda() {
       const timeMin = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
       const timeMax = new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString()
 
-      const r = await execute('GOOGLECALENDAR_EVENTS_LIST', {
-        timeMin,
-        timeMax,
-        singleEvents: true,
-        orderBy: 'startTime',
+      // Sincronização manual pelo servidor (conta do dono), que lista os eventos da clínica.
+      const r: any = await pb.send('/backend/v1/romani/google-calendar/sync', {
+        method: 'POST',
+        body: { timeMin, timeMax },
       })
 
-      if (r.successful && r.data) {
-        // Composio response data items
-        const raw = r.data as any
-        const items = raw?.items || raw?.response_data?.items || []
-        setGoogleEvents(items)
-      } else if (!r.successful) {
-        setErroGoogle(r.error || 'Falha na comunicação com o Google Calendar.')
+      if (r?.ok) {
+        setGoogleEvents(Array.isArray(r.items) ? r.items : [])
+        setErroGoogle(null)
+      } else {
+        setErroGoogle(r?.erro || 'Falha na comunicação com o Google Calendar.')
         toast({
           variant: 'destructive',
           title: 'Sincronização falhou',
           description:
             'Não foi possível buscar os eventos do Google Calendar. Verifique a conexão e tente novamente.',
         })
-      } else {
-        setErroGoogle(null)
       }
     } catch (err) {
       setErroGoogle('Erro inesperado ao sincronizar com o Google Calendar.')
@@ -326,19 +327,18 @@ export default function Agenda() {
       </div>
 
       {/* Aviso quando o Google Calendar não está conectado */}
-      {googleStatus !== 'connected' && (
+      {googleStatus === 'not_connected' && (
         <Card className="border-amber-300 bg-amber-50/70 shadow-sm">
           <CardContent className="p-4 flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="text-sm font-semibold text-amber-900">
-                Conecte o Google Calendar da clínica
+                Conta Google da clínica indisponível
               </p>
               <p className="text-xs text-amber-800 mt-0.5">
-                Sem a conexão, as consultas ficam somente na agenda do app: não entram no calendário
-                do Dr. Pedro Ivo Romani nem aparecem aqui os compromissos criados direto no Google.
-                Clique em <span className="font-semibold">"Conectar"</span> ao lado e autorize a
-                conta Google da clínica — é rápido e só precisa fazer uma vez.
+                O servidor não está com a conta Google Calendar da clínica disponível
+                {googleMotivo ? ` (${googleMotivo})` : ''}. Verifique em Conectores se o Google
+                Calendar está ativo para o app e tente novamente.
               </p>
             </div>
           </CardContent>
@@ -383,19 +383,27 @@ export default function Agenda() {
                       : 'bg-slate-100 text-slate-600 border-slate-300 text-[10px]'
                   }
                 >
-                  {googleStatus === 'connected' ? 'Ativo e Conectado' : 'Não conectado'}
+                  {googleStatus === 'connected'
+                    ? 'Ativo e Conectado'
+                    : googleStatus === 'checking'
+                      ? 'Verificando…'
+                      : 'Não conectado'}
                 </Badge>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
                 {googleStatus === 'connected'
                   ? 'As consultas agendadas sincronizam diretamente na conta Google Calendar do Dr. Pedro Ivo Romani.'
-                  : 'Conecte a conta Google da clínica para sincronizar as consultas automaticamente.'}
+                  : googleStatus === 'checking'
+                    ? 'Verificando a conta Google Calendar da clínica…'
+                    : 'A conta Google da clínica não está disponível no servidor no momento.'}
               </p>
             </div>
           </div>
 
           <div>
-            <ConnectorButton toolkit="googlecalendar" name="Google Calendar" className="text-xs" />
+            <Button variant="outline" size="sm" onClick={checkConnector} className="text-xs h-9">
+              Verificar novamente
+            </Button>
           </div>
         </CardContent>
       </Card>
