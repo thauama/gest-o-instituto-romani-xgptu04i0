@@ -27,13 +27,36 @@ onRecordAfterCreateSuccess((e) => {
       return
     }
     const horario = c.get('horario') || '09:00'
-    const hora = String((parseInt(horario.split(':')[0], 10) + 1) % 24).padStart(2, '0')
+    // Fim = 1h após o início; se vira o dia, usa a data seguinte.
+    const horaNum = parseInt(horario.split(':')[0], 10) + 1
+    let diaFim = data
+    if (horaNum >= 24) {
+      const d = new Date(`${data}T00:00:00Z`)
+      d.setUTCDate(d.getUTCDate() + 1)
+      diaFim = d.toISOString().slice(0, 10)
+    }
+    const hora = String(horaNum % 24).padStart(2, '0')
     const min = horario.split(':')[1]
+
+    // Título do evento: "Consulta — {nome da paciente} · {procedimento/tipo}".
+    let nomePaciente = ''
+    try {
+      const clienteId = c.getString('cliente')
+      if (clienteId) {
+        nomePaciente = $app.findRecordById('clientes', clienteId).getString('nome')
+      }
+    } catch (_) {}
+    let summary = 'Consulta'
+    if (nomePaciente) summary = `Consulta — ${nomePaciente}`
+    const tipoConsulta = c.getString('tipo')
+    if (tipoConsulta) summary += ` · ${tipoConsulta}`
+    console.log(`[google_sync] afterCreate summary: ${summary}`)
+
     const payload = {
-      summary: `[Instituto Romani] ${c.get('tipo') || 'Consulta'}`,
+      summary: summary,
       description: `Profissional: ${c.get('profissional') || 'Dr. Pedro Ivo Romani'}\nObservações: ${c.get('observacoes') || '—'}`,
       start_datetime: `${data}T${horario}:00`,
-      end_datetime: `${data}T${hora}:${min}:00`,
+      end_datetime: `${diaFim}T${hora}:${min}:00`,
       send_updates: 'none',
     }
     const res = $connectors.executeAsOwner('GOOGLECALENDAR_CREATE_EVENT', payload)
@@ -60,7 +83,27 @@ onRecordAfterCreateSuccess((e) => {
 onRecordAfterUpdateSuccess((e) => {
   try {
     const c = e.record
-    if (c.get('origem') === 'google_sync') {
+    // Pula apenas o ECO do próprio hook (save que só grava google_event_id/
+    // origem). Uma remarcação feita pelo usuário altera campos de agenda e
+    // DEVE atualizar o evento — antes este guard bloqueava toda remarcação.
+    const camposUsuario = [
+      'cliente',
+      'data',
+      'horario',
+      'status',
+      'tipo',
+      'profissional',
+      'observacoes',
+    ]
+    let usuarioEditou = false
+    for (let i = 0; i < camposUsuario.length; i++) {
+      const f = camposUsuario[i]
+      if ((c.getString(f) || '') !== (c.original().getString(f) || '')) {
+        usuarioEditou = true
+        break
+      }
+    }
+    if (!usuarioEditou && c.get('origem') === 'google_sync') {
       e.next()
       return
     }
@@ -84,13 +127,36 @@ onRecordAfterUpdateSuccess((e) => {
       return
     }
     const horario = c.get('horario') || '09:00'
-    const hora = String((parseInt(horario.split(':')[0], 10) + 1) % 24).padStart(2, '0')
+    // Fim = 1h após o início; se vira o dia, usa a data seguinte.
+    const horaNum = parseInt(horario.split(':')[0], 10) + 1
+    let diaFim = data
+    if (horaNum >= 24) {
+      const d = new Date(`${data}T00:00:00Z`)
+      d.setUTCDate(d.getUTCDate() + 1)
+      diaFim = d.toISOString().slice(0, 10)
+    }
+    const hora = String(horaNum % 24).padStart(2, '0')
     const min = horario.split(':')[1]
+
+    // Título do evento: "Consulta — {nome da paciente} · {procedimento/tipo}".
+    let nomePaciente = ''
+    try {
+      const clienteId = c.getString('cliente')
+      if (clienteId) {
+        nomePaciente = $app.findRecordById('clientes', clienteId).getString('nome')
+      }
+    } catch (_) {}
+    let summary = 'Consulta'
+    if (nomePaciente) summary = `Consulta — ${nomePaciente}`
+    const tipoConsulta = c.getString('tipo')
+    if (tipoConsulta) summary += ` · ${tipoConsulta}`
+    console.log(`[google_sync] afterUpdate summary: ${summary}`)
+
     const payload = {
-      summary: `[Instituto Romani] ${c.get('tipo') || 'Consulta'}`,
+      summary: summary,
       description: `Profissional: ${c.get('profissional') || 'Dr. Pedro Ivo Romani'}\nObservações: ${c.get('observacoes') || '—'}`,
       start_datetime: `${data}T${horario}:00`,
-      end_datetime: `${data}T${hora}:${min}:00`,
+      end_datetime: `${diaFim}T${hora}:${min}:00`,
       send_updates: 'none',
     }
     if (eventoId) {
