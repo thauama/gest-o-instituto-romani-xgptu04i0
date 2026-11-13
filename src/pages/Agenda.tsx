@@ -129,39 +129,12 @@ export default function Agenda() {
     }
   }
 
+  // A criação/remarcação/desmarcação NÃO chama o Google diretamente aqui:
+  // o hook no servidor (pocketbase/hooks/sync_google_calendar.pb.js) sincroniza
+  // TODA consulta criada em qualquer tela do app (Agenda, Prontuário, IA…).
   const handleCreateConsulta = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!clienteId || !data) return
-
-    let googleEventId = ''
-
-    // If connected to Google Calendar, create event directly in Dr. Romani's calendar!
-    if (syncWithGoogle && googleStatus === 'connected') {
-      try {
-        const selectedCli = clientes.find((c) => c.id === clienteId)
-        const summary = `[Instituto Romani] ${tipo} - ${selectedCli?.nome || 'Paciente'}`
-        const startDateTime = `${data}T${horario || '09:00'}:00`
-        const endDateTime = `${data}T${
-          horario
-            ? `${String(parseInt(horario.split(':')[0], 10) + 1).padStart(2, '0')}:${horario.split(':')[1]}`
-            : '10:00'
-        }:00`
-
-        const gRes = await execute('GOOGLECALENDAR_CREATE_EVENT', {
-          summary,
-          description: `Paciente: ${selectedCli?.nome}\nContato: ${selectedCli?.contato || 'N/A'}\nNotas: ${observacoes}\nProfissional: ${profissional}`,
-          start_datetime: startDateTime,
-          end_datetime: endDateTime,
-        })
-
-        if (gRes.successful && gRes.data) {
-          const resObj = gRes.data as any
-          googleEventId = resObj?.id || resObj?.response_data?.id || ''
-        }
-      } catch (gErr) {
-        console.warn('Google calendar event create notice:', gErr)
-      }
-    }
 
     await consultasService.create({
       cliente: clienteId,
@@ -171,13 +144,18 @@ export default function Agenda() {
       profissional,
       observacoes,
       status: 'agendada',
-      google_event_id: googleEventId,
     })
 
     setOpenModal(false)
     setClienteId('')
     setObservacoes('')
     await loadAll()
+    toast({
+      title: 'Consulta agendada',
+      description: syncWithGoogle
+        ? 'O evento foi enviado ao Google Calendar da clínica.'
+        : undefined,
+    })
   }
 
   const handleStatusChange = async (
@@ -186,6 +164,12 @@ export default function Agenda() {
   ) => {
     await consultasService.update(id, { status: newStatus })
     await loadAll()
+    if (newStatus === 'desmarcada') {
+      toast({
+        title: 'Consulta desmarcada',
+        description: 'O evento correspondente foi removido do Google Calendar.',
+      })
+    }
   }
 
   const filteredConsultas = consultas.filter((c) => {
