@@ -36,7 +36,7 @@ onRecordAfterCreateSuccess((e) => {
       end_datetime: `${data}T${hora}:${min}:00`,
       send_updates: 'none',
     }
-    const res = $connectors.executeAsOwner('googlecalendar', 'GOOGLECALENDAR_CREATE_EVENT', payload)
+    const res = $connectors.executeAsOwner('GOOGLECALENDAR_CREATE_EVENT', payload)
     const novoId =
       res?.data?.response_data?.id || res?.response_data?.id || res?.data?.id || res?.id || ''
     if (novoId) {
@@ -70,7 +70,7 @@ onRecordAfterUpdateSuccess((e) => {
     if (status === 'desmarcada') {
       // Desmarcada: remove o evento do Google Calendar.
       if (eventoId) {
-        $connectors.executeAsOwner('googlecalendar', 'GOOGLECALENDAR_DELETE_EVENT', {
+        $connectors.executeAsOwner('GOOGLECALENDAR_DELETE_EVENT', {
           event_id: eventoId,
         })
       }
@@ -95,17 +95,13 @@ onRecordAfterUpdateSuccess((e) => {
     }
     if (eventoId) {
       // Remarcação/edição: atualiza o evento existente.
-      $connectors.executeAsOwner('googlecalendar', 'GOOGLECALENDAR_UPDATE_EVENT', {
+      $connectors.executeAsOwner('GOOGLECALENDAR_UPDATE_EVENT', {
         event_id: eventoId,
         ...payload,
       })
     } else {
       // Consulta criada em outra tela sem evento vinculado ainda.
-      const res = $connectors.executeAsOwner(
-        'googlecalendar',
-        'GOOGLECALENDAR_CREATE_EVENT',
-        payload,
-      )
+      const res = $connectors.executeAsOwner('GOOGLECALENDAR_CREATE_EVENT', payload)
       const novoId =
         res?.data?.response_data?.id || res?.response_data?.id || res?.data?.id || res?.id || ''
       if (novoId) {
@@ -130,7 +126,7 @@ onRecordAfterDeleteSuccess((e) => {
   try {
     const eventoId = e.record.get('google_event_id') || ''
     if (eventoId) {
-      $connectors.executeAsOwner('googlecalendar', 'GOOGLECALENDAR_DELETE_EVENT', {
+      $connectors.executeAsOwner('GOOGLECALENDAR_DELETE_EVENT', {
         event_id: eventoId,
       })
     }

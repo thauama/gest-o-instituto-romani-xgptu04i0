@@ -10,6 +10,7 @@ import {
   Plus,
   Search,
   ShieldCheck,
+  Stethoscope,
   Users,
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -40,11 +41,13 @@ import type { Cliente, ConsentimentoPaciente, TipoConsentimento } from '@/types/
 import AbaAnamnese from '@/components/prontuario/AbaAnamnese'
 import AbaDocumentos from '@/components/prontuario/AbaDocumentos'
 import AbaArquivos from '@/components/prontuario/AbaArquivos'
+import AbaEvolucao from '@/components/prontuario/AbaEvolucao'
 
-type Aba = 'anamnese' | 'documentos' | 'arquivos'
+type Aba = 'anamnese' | 'evolucao' | 'documentos' | 'arquivos'
 
 const ABAS: { id: Aba; label: string; icon: typeof ClipboardList }[] = [
   { id: 'anamnese', label: 'Anamnese', icon: ClipboardList },
+  { id: 'evolucao', label: 'Evolução', icon: Stethoscope },
   { id: 'documentos', label: 'Documentos', icon: FilePlus2 },
   { id: 'arquivos', label: 'Arquivos', icon: ImageIcon },
 ]
@@ -277,6 +280,9 @@ export default function Prontuario() {
 
       {aba === 'anamnese' && (
         <AbaAnamnese paciente={paciente} versao={versao} autor={user?.name || user?.email || '—'} />
+      )}
+      {aba === 'evolucao' && (
+        <AbaEvolucao paciente={paciente} versao={versao} autor={user?.name || user?.email || '—'} />
       )}
       {aba === 'documentos' && (
         <AbaDocumentos
