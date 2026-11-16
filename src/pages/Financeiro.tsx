@@ -312,13 +312,26 @@ export default function Financeiro() {
   }
 
   const excluirLancamento = async (r: RegistroFinanceiro) => {
+    // Somente administrador gerencia o financeiro (regra da coleção no backend)
+    if (!isAdmin) {
+      toast({
+        title: 'Ação permitida apenas ao administrador',
+        description: 'Somente o admin pode excluir lançamentos financeiros.',
+        variant: 'destructive',
+      })
+      return
+    }
     if (!confirm(`Excluir o lançamento "${r.descricao}"?`)) return
     try {
       await financeiroService.delete(r.id)
+      // Remoção otimista: some da lista imediatamente…
+      setRegistros((rs) => rs.filter((x) => x.id !== r.id))
       toast({ title: 'Lançamento excluído' })
+      // …e o recarregamento confirma que não volta (se falhar, o erro aparece na tela)
       await carregar()
     } catch (err) {
       toast({ title: 'Erro ao excluir', description: getErrorMessage(err), variant: 'destructive' })
+      await carregar()
     }
   }
 
@@ -649,22 +662,26 @@ export default function Financeiro() {
                         )}
                       </td>
                       <td className="py-2.5 text-right whitespace-nowrap">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => abrirEdicao(r)}
-                          className="h-7 w-7 p-0 text-slate-300 hover:text-sky-300 hover:bg-slate-800"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => excluirLancamento(r)}
-                          className="h-7 w-7 p-0 text-slate-300 hover:text-rose-300 hover:bg-slate-800"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        {isAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => abrirEdicao(r)}
+                            className="h-7 w-7 p-0 text-slate-300 hover:text-sky-300 hover:bg-slate-800"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        {isAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => excluirLancamento(r)}
+                            className="h-7 w-7 p-0 text-slate-300 hover:text-rose-300 hover:bg-slate-800"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   ))}
